@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Cairo', sans-serif;
+  }
+  body {
+    @apply bg-abha-bg text-gray-800;
+    direction: rtl;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-abha-green hover:bg-abha-greenLight text-white font-semibold py-2 px-4 rounded-lg transition;
+  }
+  .btn-gold {
+    @apply bg-abha-gold hover:opacity-90 text-white font-semibold py-2 px-4 rounded-lg transition;
+  }
+  .card {
+    @apply bg-white rounded-xl shadow-md p-5 border border-gray-100;
+  }
+  .input {
+    @apply w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-abha-green focus:border-transparent;
+  }
+}
