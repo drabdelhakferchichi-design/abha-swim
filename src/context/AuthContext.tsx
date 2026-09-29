@@ -9,9 +9,13 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut,
+  updatePassword as fbUpdatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+  updateProfile,
   type User,
 } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
 
 // ─── الأدوار ───
@@ -20,11 +24,11 @@ export type Role = "admin" | "coach" | "swimmer" | "parent";
 export interface AppUser {
   uid: string;
   email: string;
+  username?: string;
   name: string;
   role: Role;
-  // حقول إضافية اختيارية
-  swimmerId?: string;   // للسباح
-  parentOf?: string;    // لولي الأمر
+  swimmerId?: string;
+  parentOf?: string;
 }
 
 interface AuthContextType {
@@ -32,6 +36,9 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateUsername: (newUsername: string) => Promise<void>;
+  updateDisplayName: (newName: string) => Promise<void>;
+  updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,7 +55,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // جلب الدور من Firestore
       try {
         const ref = doc(db, "users", fbUser.uid);
         const snap = await getDoc(ref);
@@ -58,14 +64,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser({
             uid: fbUser.uid,
             email: fbUser.email || "",
+            username: data.username,
             name: data.name || "",
             role: (data.role as Role) || "swimmer",
             swimmerId: data.swimmerId,
             parentOf: data.parentOf,
           });
         } else {
-          // مستخدم بدون وثيقة في Firestore — نعتبره admin مؤقتاً
-          // ⚠️ للتطوير فقط — احذف هذا لاحقاً
           setUser({
             uid: fbUser.uid,
             email: fbUser.email || "",
@@ -92,14 +97,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signOut(auth);
   };
 
+  // ─── تغيير اسم المستخدم ───
+  const updateUsername = async (newUsername: string) => {
+    if (!auth.currentUser) throw new Error("لا يوجد مستخدم");
+    const trimmed = newUsername.trim();
+    if (trimmed.length < 3) throw new Error("اسم المستخدم قصير جداً (3 أحرف على الأقل)");
+
+    await updateDoc(doc(db, "users", auth.currentUser.uid), {
+      username: trimmed,
+    });
+
+    setUser((prev) => (prev ? { ...prev, username: trimmed } : prev));
+  };
+
+  // ─── تغيير الاسم الكامل ───
+  const updateDisplayName = async (newName: string) => {
+    if (!auth.currentUser) throw new Error("لا يوجد مستخدم");
+    const trimmed = newName.trim();
+    if (trimmed.length < 2) throw new Error("الاسم قصير جداً");
+
+    await updateProfile(auth.currentUser, { displayName: trimmed });
+    await updateDoc(doc(db, "users", auth.currentUser.uid), {
+      name: trimmed,
+    });
+
+    setUser((prev) => (prev ? { ...prev, name: trimmed } : prev));
+  };
+
+  // ─── تغيير كلمة المرور ───
+  const updatePassword = async (currentPassword: string, newPassword: string) => {
+    if (!auth.currentUser || !auth.currentUser.email) {
+      throw new Error("لا يوجد مستخدم");
+    }
+    if (newPassword.length < 6) {
+      throw new Error("كلمة المرور الجديدة قصيرة جداً (6 أحرف على الأقل)");
+    }
+
+    // إعادة المصادقة أولاً (مطلوب من Firebase)
+    const credential = EmailAuthProvider.credential(
+      auth.currentUser.email,
+      currentPassword
+    );
+    await reauthenticateWithCredential(auth.currentUser, credential);
+
+    // تحديث كلمة المرور
+    await fbUpdatePassword(auth.currentUser, newPassword);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        logout,
+        updateUsername,
+        updateDisplayName,
+        updatePassword,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 }
 
-// Hook للاستعمال داخل الصفحات
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
