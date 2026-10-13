@@ -27,34 +27,53 @@ module.exports = async function handler(req, res) {
   }
 
   const {
-    // بيانات ولي الأمر (الحساب)
     username,
     password,
-    email,          // اختياري
+    email,
     parentName,
-
-    // بيانات السباح
     swimmerName,
     ageCategory,
     team,
     points,
-    coachId,        // UID المدرب (حسن أو علاء)
+    coachId,
     coachName,
   } = req.body || {};
 
+  // ─── DEBUG LOGGING ───
+  console.log("=== DEBUG INFO ===");
+  console.log("ENV exists:", !!process.env.FIREBASE_SERVICE_ACCOUNT);
+  console.log("ENV length:", process.env.FIREBASE_SERVICE_ACCOUNT?.length || 0);
+  console.log("Received body:", {
+    username,
+    password: password ? `${password.length} chars` : "MISSING",
+    email,
+    parentName,
+    swimmerName,
+    ageCategory,
+    team,
+    points,
+    coachId,
+    coachName,
+  });
+
   // ─── تحقق ───
   if (!username || !password || !parentName || !swimmerName || !coachId) {
+    console.log("Validation failed - missing fields");
     return res.status(400).json({
       error: "حقول مطلوبة ناقصة: username, password, parentName, swimmerName, coachId",
+      received: { username, parentName, swimmerName, coachId, hasPassword: !!password },
     });
   }
 
   try {
+    console.log("Step 1: Initializing admin...");
     ensureAdmin();
+    console.log("Step 1: OK");
+
     const db = admin.firestore();
 
     // ─── 1. إنشاء حساب Firebase Auth لولي الأمر ───
-    // نستخدم username كإيميل داخلي
+    console.log("Step 2: Creating parent Auth account...");
     const authEmail = email && email.trim() !== ""
       ? email.trim()
       : `${username}@abha-swim.local`;
@@ -64,10 +83,12 @@ module.exports = async function handler(req, res) {
       password,
       displayName: parentName,
     });
+    console.log("Step 2: OK - UID:", parentRecord.uid);
 
-    // ─── 2. إنشاء وثيقة السباح في Firestore ───
+    // ─── 2. إنشاء وثيقة السباح ───
+    console.log("Step 3: Creating swimmer document...");
     const swimmerRef = db.collection("swimmers").doc();
-    const swimmerData = {
+    await swimmerRef.set({
       name: swimmerName,
       ageCategory: ageCategory || "",
       team: team || "",
@@ -77,10 +98,11 @@ module.exports = async function handler(req, res) {
       parentUid: parentRecord.uid,
       parentName,
       createdAt: new Date(),
-    };
-    await swimmerRef.set(swimmerData);
+    });
+    console.log("Step 3: OK - ID:", swimmerRef.id);
 
-    // ─── 3. إنشاء وثيقة ولي الأمر في Firestore ───
+    // ─── 3. إنشاء وثيقة ولي الأمر ───
+    console.log("Step 4: Creating parent Firestore doc...");
     await db.collection("users").doc(parentRecord.uid).set({
       uid: parentRecord.uid,
       username,
@@ -93,7 +115,9 @@ module.exports = async function handler(req, res) {
       mustChangePassword: true,
       createdAt: new Date(),
     });
+    console.log("Step 4: OK");
 
+    console.log("=== SUCCESS ===");
     return res.status(200).json({
       success: true,
       parentUid: parentRecord.uid,
@@ -102,7 +126,10 @@ module.exports = async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error("Error:", error);
+    console.error("=== ERROR ===");
+    console.error("Message:", error.message);
+    console.error("Code:", error.code);
+    console.error("Stack:", error.stack);
 
     if (error.code === "auth/email-already-exists") {
       return res.status(400).json({ error: "اسم المستخدم أو الإيميل مستخدم بالفعل" });
@@ -113,6 +140,7 @@ module.exports = async function handler(req, res) {
 
     return res.status(500).json({
       error: error.message || "خطأ في إنشاء الحساب",
+      code: error.code || null,
     });
   }
 };
