@@ -1,6 +1,5 @@
 const admin = require("firebase-admin");
 
-// ─── تهيئة Firebase Admin (مرة واحدة) ───
 let adminInitialized = false;
 function ensureAdmin() {
   if (adminInitialized) return;
@@ -8,12 +7,8 @@ function ensureAdmin() {
     adminInitialized = true;
     return;
   }
-
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!raw) {
-    throw new Error("FIREBASE_SERVICE_ACCOUNT missing");
-  }
-
+  if (!raw) throw new Error("FIREBASE_SERVICE_ACCOUNT missing");
   const serviceAccount = JSON.parse(raw);
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
@@ -32,64 +27,92 @@ module.exports = async function handler(req, res) {
   }
 
   const {
-    email, password, username, name, role,
-    ageCategory, team, points, parentUid,
+    // بيانات ولي الأمر (الحساب)
+    username,
+    password,
+    email,          // اختياري
+    parentName,
+
+    // بيانات السباح
+    swimmerName,
+    ageCategory,
+    team,
+    points,
+    coachId,        // UID المدرب (حسن أو علاء)
+    coachName,
   } = req.body || {};
 
-  if (!email || !password || !name || !role) {
+  // ─── تحقق ───
+  if (!username || !password || !parentName || !swimmerName || !coachId) {
     return res.status(400).json({
-      error: "Missing required fields: email, password, name, role",
+      error: "حقول مطلوبة ناقصة: username, password, parentName, swimmerName, coachId",
     });
   }
 
   try {
     ensureAdmin();
+    const db = admin.firestore();
 
-    const userRecord = await admin.auth().createUser({
-      email,
+    // ─── 1. إنشاء حساب Firebase Auth لولي الأمر ───
+    // نستخدم username كإيميل داخلي
+    const authEmail = email && email.trim() !== ""
+      ? email.trim()
+      : `${username}@abha-swim.local`;
+
+    const parentRecord = await admin.auth().createUser({
+      email: authEmail,
       password,
-      displayName: name,
+      displayName: parentName,
     });
 
-    const userData = {
-      uid: userRecord.uid,
-      email,
-      username: username || null,
-      name,
-      role,
+    // ─── 2. إنشاء وثيقة السباح في Firestore ───
+    const swimmerRef = db.collection("swimmers").doc();
+    const swimmerData = {
+      name: swimmerName,
+      ageCategory: ageCategory || "",
+      team: team || "",
+      points: points || 0,
+      coachId,
+      coachName: coachName || "",
+      parentUid: parentRecord.uid,
+      parentName,
       createdAt: new Date(),
     };
+    await swimmerRef.set(swimmerData);
 
-    if (role === "swimmer") {
-      userData.ageCategory = ageCategory || null;
-      userData.team = team || null;
-      userData.points = points || 0;
-      userData.parentUid = parentUid || null;
-    }
-
-    if (role === "parent" && parentUid) {
-      userData.swimmerUid = parentUid;
-    }
-
-    await admin.firestore().collection("users").doc(userRecord.uid).set(userData);
+    // ─── 3. إنشاء وثيقة ولي الأمر في Firestore ───
+    await db.collection("users").doc(parentRecord.uid).set({
+      uid: parentRecord.uid,
+      username,
+      email: email && email.trim() !== "" ? email.trim() : null,
+      name: parentName,
+      role: "parent",
+      swimmerId: swimmerRef.id,
+      swimmerName,
+      coachId,
+      mustChangePassword: true,
+      createdAt: new Date(),
+    });
 
     return res.status(200).json({
       success: true,
-      uid: userRecord.uid,
-      message: "User created successfully",
+      parentUid: parentRecord.uid,
+      swimmerId: swimmerRef.id,
+      message: "تم إنشاء الحساب والسباح بنجاح",
     });
+
   } catch (error) {
     console.error("Error:", error);
 
     if (error.code === "auth/email-already-exists") {
-      return res.status(400).json({ error: "البريد الإلكتروني مستخدم بالفعل" });
+      return res.status(400).json({ error: "اسم المستخدم أو الإيميل مستخدم بالفعل" });
     }
     if (error.code === "auth/invalid-password") {
-      return res.status(400).json({ error: "كلمة المرور ضعيفة جداً (6 أحرف على الأقل)" });
+      return res.status(400).json({ error: "كلمة المرور ضعيفة (6 أحرف على الأقل)" });
     }
 
     return res.status(500).json({
-      error: error.message || "خطأ في إنشاء المستخدم",
+      error: error.message || "خطأ في إنشاء الحساب",
     });
   }
 };
