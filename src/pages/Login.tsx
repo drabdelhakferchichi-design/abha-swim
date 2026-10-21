@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [usernameOrEmail, setUsernameOrEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -15,11 +15,21 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      await login(email, password);
+      await login(usernameOrEmail, password);
       navigate("/");
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
-      setError("البريد الإلكتروني أو كلمة المرور غير صحيحة");
+      const error = err as { code?: string; message?: string };
+
+      if (error.code === "auth/wrong-password" || error.code === "auth/invalid-credential") {
+        setError("اسم المستخدم أو كلمة المرور غير صحيحة");
+      } else if (error.code === "auth/user-not-found") {
+        setError("المستخدم غير موجود");
+      } else if (error.message) {
+        setError(error.message);
+      } else {
+        setError("خطأ في تسجيل الدخول");
+      }
     }
     setLoading(false);
   };
@@ -27,7 +37,6 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-abha-green to-abha-greenLight p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
-        {/* اللوغو والعنوان */}
         <div className="text-center mb-8">
           <div className="w-20 h-20 mx-auto bg-abha-green rounded-full flex items-center justify-center mb-4">
             <span className="text-white text-3xl font-bold">أ</span>
@@ -38,21 +47,23 @@ export default function Login() {
           <p className="text-gray-500 text-sm mt-2">تسجيل الدخول</p>
         </div>
 
-        {/* النموذج */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-semibold mb-1 text-gray-700">
-              البريد الإلكتروني
+              اسم المستخدم أو البريد الإلكتروني
             </label>
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              value={usernameOrEmail}
+              onChange={(e) => setUsernameOrEmail(e.target.value)}
               className="input"
-              placeholder="example@abha-swim.com"
+              placeholder="abu_nasser"
               required
               dir="ltr"
             />
+            <p className="text-xs text-gray-400 mt-1">
+              مثال : abu_nasser (بدون @)
+            </p>
           </div>
 
           <div>

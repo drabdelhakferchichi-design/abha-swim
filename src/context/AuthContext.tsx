@@ -15,10 +15,17 @@ import {
   updateProfile,
   type User,
 } from "firebase/auth";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  updateDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
 
-// ─── الأدوار ───
 export type Role = "admin" | "coach" | "swimmer" | "parent";
 
 export interface AppUser {
@@ -34,7 +41,7 @@ export interface AppUser {
 interface AuthContextType {
   user: AppUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (usernameOrEmail: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUsername: (newUsername: string) => Promise<void>;
   updateDisplayName: (newName: string) => Promise<void>;
@@ -89,19 +96,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsub();
   }, []);
 
-  const login = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+  // ─── تسجيل الدخول (username أو email) ───
+  const login = async (usernameOrEmail: string, password: string) => {
+    let emailToUse = usernameOrEmail.trim();
+
+    // إذا لم يكن فيه @، نفترض أنه username
+    if (!emailToUse.includes("@")) {
+      // ابحث في Firestore عن username
+      const q = query(
+        collection(db, "users"),
+        where("username", "==", emailToUse)
+      );
+      const snap = await getDocs(q);
+
+      if (snap.empty) {
+        throw new Error("اسم المستخدم غير موجود");
+      }
+
+      // إذا وجد، استخدم الإيميل الداخلي
+      emailToUse = `${emailToUse}@abha-swim.local`;
+    }
+
+    await signInWithEmailAndPassword(auth, emailToUse, password);
   };
 
   const logout = async () => {
     await signOut(auth);
   };
 
-  // ─── تغيير اسم المستخدم ───
   const updateUsername = async (newUsername: string) => {
     if (!auth.currentUser) throw new Error("لا يوجد مستخدم");
     const trimmed = newUsername.trim();
-    if (trimmed.length < 3) throw new Error("اسم المستخدم قصير جداً (3 أحرف على الأقل)");
+    if (trimmed.length < 3) throw new Error("اسم المستخدم قصير جداً");
 
     await updateDoc(doc(db, "users", auth.currentUser.uid), {
       username: trimmed,
@@ -110,7 +136,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser((prev) => (prev ? { ...prev, username: trimmed } : prev));
   };
 
-  // ─── تغيير الاسم الكامل ───
   const updateDisplayName = async (newName: string) => {
     if (!auth.currentUser) throw new Error("لا يوجد مستخدم");
     const trimmed = newName.trim();
@@ -124,23 +149,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser((prev) => (prev ? { ...prev, name: trimmed } : prev));
   };
 
-  // ─── تغيير كلمة المرور ───
   const updatePassword = async (currentPassword: string, newPassword: string) => {
     if (!auth.currentUser || !auth.currentUser.email) {
       throw new Error("لا يوجد مستخدم");
     }
     if (newPassword.length < 6) {
-      throw new Error("كلمة المرور الجديدة قصيرة جداً (6 أحرف على الأقل)");
+      throw new Error("كلمة المرور الجديدة قصيرة جداً");
     }
 
-    // إعادة المصادقة أولاً (مطلوب من Firebase)
     const credential = EmailAuthProvider.credential(
       auth.currentUser.email,
       currentPassword
     );
     await reauthenticateWithCredential(auth.currentUser, credential);
-
-    // تحديث كلمة المرور
     await fbUpdatePassword(auth.currentUser, newPassword);
   };
 
