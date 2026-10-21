@@ -1,9 +1,11 @@
 import { useEffect, useState, type FormEvent } from "react";
 import {
   collection,
+  addDoc,
   query,
   orderBy,
   onSnapshot,
+  serverTimestamp,
   deleteDoc,
   doc,
 } from "firebase/firestore";
@@ -40,20 +42,12 @@ export default function Swimmers() {
   const [search, setSearch] = useState("");
   const [msg, setMsg] = useState({ type: "", text: "" });
 
-  // ─── حقول السباح ───
   const [name, setName] = useState("");
   const [ageCategory, setAgeCategory] = useState(ageCategories[0]);
   const [team, setTeam] = useState("");
   const [points, setPoints] = useState(0);
   const [coachId, setCoachId] = useState("");
 
-  // ─── حقول ولي الأمر ───
-  const [parentName, setParentName] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [parentEmail, setParentEmail] = useState("");
-
-  // ─── جلب السباحين ───
   useEffect(() => {
     const q = query(collection(db, "swimmers"), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
@@ -77,7 +71,6 @@ export default function Swimmers() {
     return () => unsub();
   }, []);
 
-  // ─── جلب المدربين ───
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "users"), (snap) => {
       const items: Coach[] = [];
@@ -93,19 +86,10 @@ export default function Swimmers() {
     return () => unsub();
   }, [coachId]);
 
-  const generatePassword = () => {
-    const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
-    let pass = "Abha@";
-    for (let i = 0; i < 6; i++) {
-      pass += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    setPassword(pass);
-  };
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!user || !name.trim() || !username.trim() || !password.trim() || !coachId) {
-      setMsg({ type: "error", text: "املأ جميع الحقول المطلوبة" });
+    if (!user || !name.trim() || !coachId) {
+      setMsg({ type: "error", text: "املأ الحقول المطلوبة" });
       return;
     }
 
@@ -115,44 +99,31 @@ export default function Swimmers() {
     const selectedCoach = coaches.find((c) => c.uid === coachId);
 
     try {
-      const response = await fetch("/api/create-user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: username.trim(),
-          password,
-          email: parentEmail.trim(),
-          parentName: parentName.trim() || `ولي أمر ${name.trim()}`,
-          swimmerName: name.trim(),
-          ageCategory,
-          team: team.trim(),
-          points,
-          coachId,
-          coachName: selectedCoach?.name || "",
-        }),
+      await addDoc(collection(db, "swimmers"), {
+        name: name.trim(),
+        ageCategory,
+        team: team.trim(),
+        points,
+        coachId,
+        coachName: selectedCoach?.name || "",
+        parentUid: "",
+        parentName: "",
+        createdBy: user.uid,
+        createdAt: serverTimestamp(),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "خطأ في الإنشاء");
-      }
-
-      setMsg({ type: "success", text: "✅ تم إنشاء السباح وحساب ولي الأمر بنجاح" });
-
-      // إعادة تعيين
+      setMsg({ type: "success", text: "✅ تم حفظ السباح بنجاح" });
       setName("");
       setTeam("");
       setPoints(0);
-      setParentName("");
-      setUsername("");
-      setPassword("");
-      setParentEmail("");
 
-      setTimeout(() => setShowForm(false), 2000);
+      setTimeout(() => {
+        setShowForm(false);
+        setMsg({ type: "", text: "" });
+      }, 2000);
     } catch (err: unknown) {
       const error = err as { message?: string };
-      setMsg({ type: "error", text: error.message || "خطأ في الإنشاء" });
+      setMsg({ type: "error", text: error.message || "خطأ في الحفظ" });
     }
     setLoading(false);
   };
@@ -183,69 +154,39 @@ export default function Swimmers() {
         )}
       </div>
 
-      {/* نموذج الإضافة */}
       {showForm && isAdmin && (
-        <form onSubmit={handleSubmit} className="card mb-6 space-y-6">
-          {/* ─── بيانات السباح ─── */}
-          <div>
-            <h2 className="text-lg font-bold text-abha-green mb-3">🏊 بيانات السباح</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold mb-1">الاسم الكامل *</label>
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="input" required />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold mb-1">الفئة العمرية</label>
-                <select value={ageCategory} onChange={(e) => setAgeCategory(e.target.value)} className="input">
-                  {ageCategories.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold mb-1">الفريق / النادي</label>
-                <input type="text" value={team} onChange={(e) => setTeam(e.target.value)} className="input" placeholder="مثال : فريق الناشئين" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold mb-1">النقاط</label>
-                <input type="number" value={points} onChange={(e) => setPoints(Number(e.target.value))} className="input" min={0} />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="block text-sm font-semibold mb-1">المدرب المسؤول *</label>
-                <select value={coachId} onChange={(e) => setCoachId(e.target.value)} className="input" required>
-                  {coaches.map((c) => <option key={c.uid} value={c.uid}>{c.name}</option>)}
-                </select>
-              </div>
+        <form onSubmit={handleSubmit} className="card mb-6">
+          <h2 className="text-lg font-bold text-abha-green mb-4">📝 بيانات السباح</h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold mb-1">الاسم الكامل *</label>
+              <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="input" required />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold mb-1">الفئة العمرية</label>
+              <select value={ageCategory} onChange={(e) => setAgeCategory(e.target.value)} className="input">
+                {ageCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold mb-1">الفريق / النادي</label>
+              <input type="text" value={team} onChange={(e) => setTeam(e.target.value)} className="input" placeholder="مثال : فريق الناشئين" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold mb-1">النقاط</label>
+              <input type="number" value={points} onChange={(e) => setPoints(Number(e.target.value))} className="input" min={0} />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-semibold mb-1">المدرب المسؤول *</label>
+              <select value={coachId} onChange={(e) => setCoachId(e.target.value)} className="input" required>
+                {coaches.map((c) => <option key={c.uid} value={c.uid}>{c.name}</option>)}
+              </select>
             </div>
           </div>
 
-          {/* ─── حساب ولي الأمر ─── */}
-          <div className="border-t pt-4">
-            <h2 className="text-lg font-bold text-abha-green mb-3">👨‍👦 حساب ولي الأمر</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold mb-1">اسم ولي الأمر</label>
-                <input type="text" value={parentName} onChange={(e) => setParentName(e.target.value)} className="input" placeholder="(اختياري — سيُولّد تلقائياً)" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold mb-1">اسم المستخدم *</label>
-                <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="input" dir="ltr" placeholder="ex: ahmed_dad" required />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold mb-1">كلمة المرور المؤقتة *</label>
-                <div className="flex gap-2">
-                  <input type="text" value={password} onChange={(e) => setPassword(e.target.value)} className="input" dir="ltr" required />
-                  <button type="button" onClick={generatePassword} className="btn-gold whitespace-nowrap">🎲</button>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold mb-1">الإيميل (اختياري)</label>
-                <input type="email" value={parentEmail} onChange={(e) => setParentEmail(e.target.value)} className="input" dir="ltr" placeholder="للاسترجاع" />
-              </div>
-            </div>
-          </div>
-
-          {/* رسالة */}
           {msg.text && (
-            <div className={`text-sm rounded-lg p-3 ${
+            <div className={`text-sm rounded-lg p-3 mt-4 ${
               msg.type === "success"
                 ? "bg-green-50 border border-green-200 text-green-700"
                 : "bg-red-50 border border-red-200 text-red-700"
@@ -254,9 +195,9 @@ export default function Swimmers() {
             </div>
           )}
 
-          <div className="flex gap-3">
+          <div className="mt-6 flex gap-3">
             <button type="submit" disabled={loading} className="btn-primary disabled:opacity-50">
-              {loading ? "جاري الإنشاء..." : "✅ حفظ وإنشاء الحساب"}
+              {loading ? "جاري الحفظ..." : "✅ حفظ"}
             </button>
             <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-gray-600">
               إلغاء
@@ -265,21 +206,13 @@ export default function Swimmers() {
         </form>
       )}
 
-      {/* البحث */}
       <div className="card mb-4">
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="input"
-          placeholder="🔍 ابحث عن سباح..."
-        />
+        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} className="input" placeholder="🔍 ابحث عن سباح..." />
       </div>
 
-      {/* القائمة */}
       {filtered.length === 0 ? (
         <div className="card text-center py-12">
-          <p className="text-gray-500">لا يوجد سباحون مسجّلون حالياً</p>
+          <p className="text-gray-500">لا يوجد سباحون مسجلون حالياً</p>
         </div>
       ) : (
         <div className="card overflow-x-auto">
@@ -307,7 +240,13 @@ export default function Swimmers() {
                   <td className="p-3">
                     <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">{s.coachName || "-"}</span>
                   </td>
-                  <td className="p-3">{s.parentName || "-"}</td>
+                  <td className="p-3">
+                    {s.parentName ? (
+                      <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">✅ {s.parentName}</span>
+                    ) : (
+                      <span className="text-gray-400 text-xs">بدون</span>
+                    )}
+                  </td>
                   <td className="p-3">
                     {isAdmin && (
                       <button onClick={() => handleDelete(s.id)} className="text-red-500 hover:text-red-700">🗑️</button>
