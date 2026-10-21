@@ -14,6 +14,7 @@ const menuItems: MenuItem[] = [
   { to: "/swimmers",      label: "السباحون",      icon: "🏊", roles: ["admin", "coach"] },
   { to: "/parents",       label: "أولياء الأمور", icon: "👨‍👦", roles: ["admin"] },
   { to: "/news",          label: "المستجدات",     icon: "📢", roles: ["admin", "coach", "swimmer", "parent"] },
+  { to: "/messages",      label: "التواصل",       icon: "💬", roles: ["admin", "coach", "parent"] },
   { to: "/trainings",     label: "جدول التمارين", icon: "📅", roles: ["admin", "coach", "swimmer", "parent"] },
   { to: "/times",         label: "الأرقام والأزمنة", icon: "⏱️", roles: ["admin", "coach", "swimmer", "parent"] },
   { to: "/competitions",  label: "البطولات",      icon: "🏆", roles: ["admin", "coach", "swimmer", "parent"] },
