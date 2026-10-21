@@ -31,7 +31,7 @@ interface Coach {
   name: string;
 }
 
-const ageCategories = ["6-8", "9-10", "11-12", "13-14", "15-17", "18+"];
+const ageCategories = ["7-8", "9-10", "11-12", "13-14", "15-17", "عمومي"];
 
 export default function Swimmers() {
   const { user } = useAuth();
