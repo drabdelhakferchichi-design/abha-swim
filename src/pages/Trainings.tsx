@@ -19,9 +19,10 @@ interface Training {
   startTime: string;
   endTime: string;
   location: string;
-  ageCategory: string;
+  ageCategories: string[];  // ← مصفوفة !
   notes: string;
   coachName: string;
+  groupId: string;           // ← لربط التمارين المنشأة معاً
   createdAt: Date | null;
 }
 
@@ -41,7 +42,7 @@ export default function Trainings() {
   const [startTime, setStartTime] = useState("16:00");
   const [endTime, setEndTime] = useState("18:00");
   const [location, setLocation] = useState(locations[0]);
-  const [ageCategory, setAgeCategory] = useState(ageCategories[0]);
+  const [selectedCats, setSelectedCats] = useState<string[]>(["7-8", "9-10", "11-12"]);
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
@@ -55,9 +56,10 @@ export default function Trainings() {
           startTime: data.startTime || "",
           endTime: data.endTime || "",
           location: data.location || "",
-          ageCategory: data.ageCategory || "",
+          ageCategories: data.ageCategories || (data.ageCategory ? [data.ageCategory] : []),
           notes: data.notes || "",
           coachName: data.coachName || "",
+          groupId: data.groupId || "",
           createdAt: data.createdAt?.toDate() || null,
         };
       });
@@ -66,9 +68,21 @@ export default function Trainings() {
     return () => unsub();
   }, []);
 
+  const toggleCat = (cat: string) => {
+    setSelectedCats((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
+    );
+  };
+
+  const selectAll = () => setSelectedCats([...ageCategories]);
+  const selectNone = () => setSelectedCats([]);
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || selectedCats.length === 0) {
+      setMsg({ type: "error", text: "اختر فئة واحدة على الأقل" });
+      return;
+    }
     setLoading(true);
     setMsg({ type: "", text: "" });
 
@@ -78,14 +92,15 @@ export default function Trainings() {
         startTime,
         endTime,
         location,
-        ageCategory,
+        ageCategories: selectedCats,
         notes: notes.trim(),
         coachName: user.name || user.email,
         createdBy: user.uid,
+        groupId: `training_${Date.now()}`,
         createdAt: serverTimestamp(),
       });
 
-      setMsg({ type: "success", text: "✅ تم إضافة التمرين" });
+      setMsg({ type: "success", text: `✅ تم إضافة التمرين لـ ${selectedCats.length} فئة` });
       setNotes("");
 
       setTimeout(() => {
@@ -110,10 +125,9 @@ export default function Trainings() {
 
   const canEdit = user?.role === "admin" || user?.role === "coach";
 
-  // ─── تجميع حسب اليوم ───
   const filtered = filterAge === "all"
     ? list
-    : list.filter((t) => t.ageCategory === filterAge || t.ageCategory === "عمومي");
+    : list.filter((t) => t.ageCategories.includes(filterAge) || t.ageCategories.includes("عمومي"));
 
   const byDay: Record<string, Training[]> = {};
   days.forEach((d) => {
@@ -144,9 +158,9 @@ export default function Trainings() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-semibold mb-1">الفئة العمرية</label>
-              <select value={ageCategory} onChange={(e) => setAgeCategory(e.target.value)} className="input">
-                {ageCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+              <label className="block text-sm font-semibold mb-1">المكان</label>
+              <select value={location} onChange={(e) => setLocation(e.target.value)} className="input">
+                {locations.map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
             </div>
             <div>
@@ -157,16 +171,41 @@ export default function Trainings() {
               <label className="block text-sm font-semibold mb-1">إلى</label>
               <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="input" dir="ltr" required />
             </div>
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-semibold mb-1">المكان</label>
-              <select value={location} onChange={(e) => setLocation(e.target.value)} className="input">
-                {locations.map((l) => <option key={l} value={l}>{l}</option>)}
-              </select>
+          </div>
+
+          <div className="border-t pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-semibold">الفئات العمرية *</label>
+              <div className="flex gap-2">
+                <button type="button" onClick={selectAll} className="text-xs text-abha-green hover:underline">تحديد الكل</button>
+                <span className="text-gray-400">|</span>
+                <button type="button" onClick={selectNone} className="text-xs text-red-600 hover:underline">إلغاء الكل</button>
+              </div>
             </div>
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-semibold mb-1">ملاحظات (اختياري)</label>
-              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="input" rows={2} />
+            <div className="flex flex-wrap gap-2">
+              {ageCategories.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => toggleCat(cat)}
+                  className={`px-3 py-2 rounded-lg text-sm transition ${
+                    selectedCats.includes(cat)
+                      ? "bg-abha-green text-white font-semibold"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  {selectedCats.includes(cat) ? "✓ " : ""}{cat}
+                </button>
+              ))}
             </div>
+            <p className="text-xs text-gray-500 mt-2">
+              محدد : {selectedCats.length} فئة — سيُضاف التمرين لكل الفئات المحددة
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold mb-1">ملاحظات (اختياري)</label>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="input" rows={2} />
           </div>
 
           {msg.text && (
@@ -180,8 +219,8 @@ export default function Trainings() {
           )}
 
           <div className="flex gap-3">
-            <button type="submit" disabled={loading} className="btn-primary disabled:opacity-50">
-              {loading ? "جاري الحفظ..." : "✅ حفظ"}
+            <button type="submit" disabled={loading || selectedCats.length === 0} className="btn-primary disabled:opacity-50">
+              {loading ? "جاري الحفظ..." : `✅ حفظ لـ ${selectedCats.length} فئة`}
             </button>
             <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-gray-600">
               إلغاء
@@ -190,7 +229,6 @@ export default function Trainings() {
         </form>
       )}
 
-      {/* الفلترة */}
       <div className="card mb-4">
         <label className="block text-sm font-semibold mb-2">عرض حسب الفئة :</label>
         <div className="flex flex-wrap gap-2">
@@ -216,7 +254,6 @@ export default function Trainings() {
         </div>
       </div>
 
-      {/* الجدول */}
       {Object.keys(byDay).length === 0 ? (
         <div className="card text-center py-12">
           <p className="text-gray-500">لا يوجد تمارين مسجّلة حالياً</p>
@@ -233,14 +270,18 @@ export default function Trainings() {
                   {items.map((t) => (
                     <div key={t.id} className="flex items-center justify-between p-3 bg-abha-bg rounded-lg">
                       <div className="flex-1">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-wrap">
                           <span className="font-mono text-sm font-bold text-abha-green" dir="ltr">
                             {t.startTime} → {t.endTime}
                           </span>
-                          <span className="bg-abha-gold text-white px-2 py-0.5 rounded text-xs">
-                            {t.ageCategory}
-                          </span>
                           <span className="text-sm text-gray-700">📍 {t.location}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {t.ageCategories.map((cat) => (
+                            <span key={cat} className="bg-abha-gold text-white px-2 py-0.5 rounded text-xs">
+                              {cat}
+                            </span>
+                          ))}
                         </div>
                         {t.notes && <p className="text-xs text-gray-500 mt-1">📝 {t.notes}</p>}
                         <p className="text-xs text-gray-400 mt-1">👨‍🏫 {t.coachName}</p>
@@ -248,7 +289,7 @@ export default function Trainings() {
                       {canEdit && (
                         <button
                           onClick={() => handleDelete(t.id)}
-                          className="text-red-500 hover:text-red-700"
+                          className="text-red-500 hover:text-red-700 ml-2"
                         >
                           🗑️
                         </button>
