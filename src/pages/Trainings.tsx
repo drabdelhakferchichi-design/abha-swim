@@ -28,7 +28,7 @@ interface Training {
 
 const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
 const ageCategories = ["7-8", "9-10", "11-12", "13-14", "15-17", "عمومي"];
-const locations = ["المسبح الكبير", "المسبح الصغير", "الصالة الرياضية"];
+const locations = ["مسبح أبها", "مسبح المحالة"];
 
 export default function Trainings() {
   const { user } = useAuth();
