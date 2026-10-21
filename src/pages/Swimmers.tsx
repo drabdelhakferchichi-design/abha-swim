@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
+import { Link } from "react-router-dom";
 import Layout from "../components/Layout";
 
 interface Swimmer {
@@ -248,9 +249,22 @@ export default function Swimmers() {
                     )}
                   </td>
                   <td className="p-3">
-                    {isAdmin && (
-                      <button onClick={() => handleDelete(s.id)} className="text-red-500 hover:text-red-700">🗑️</button>
-                    )}
+                    <div className="flex gap-2 items-center">
+                      <Link
+                        to={`/swimmers/${s.id}`}
+                        className="text-blue-600 hover:text-blue-800 text-sm"
+                      >
+                        👁️ عرض
+                      </Link>
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleDelete(s.id)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          🗑️
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -11,6 +11,7 @@ import News from "./pages/News";
 import Trainings from "./pages/Trainings";
 import Times from "./pages/Times";
 import Competitions from "./pages/Competitions";
+import SwimmerDetails from "./pages/SwimmerDetails";
 import Settings from "./pages/Settings";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -47,6 +48,7 @@ function AppRoutes() {
       <Route path="/trainings" element={<ProtectedRoute><Trainings /></ProtectedRoute>} />
       <Route path="/times" element={<ProtectedRoute><Times /></ProtectedRoute>} />
       <Route path="/competitions" element={<ProtectedRoute><Competitions /></ProtectedRoute>} />
+      <Route path="/swimmers/:id" element={<ProtectedRoute><SwimmerDetails /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
