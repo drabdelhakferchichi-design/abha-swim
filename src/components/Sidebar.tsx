@@ -12,6 +12,7 @@ const menuItems: MenuItem[] = [
   { to: "/",              label: "لوحة التحكم",   icon: "📊", roles: ["admin", "coach", "swimmer", "parent"] },
   { to: "/users",         label: "المستخدمون",    icon: "👥", roles: ["admin"] },
   { to: "/swimmers",      label: "السباحون",      icon: "🏊", roles: ["admin", "coach"] },
+  { to: "/parents",       label: "أولياء الأمور", icon: "👨‍👦", roles: ["admin"] },
   { to: "/news",          label: "المستجدات",     icon: "📢", roles: ["admin", "coach", "swimmer", "parent"] },
   { to: "/trainings",     label: "جدول التمارين", icon: "📅", roles: ["admin", "coach", "swimmer", "parent"] },
   { to: "/times",         label: "الأرقام والأزمنة", icon: "⏱️", roles: ["admin", "coach", "swimmer", "parent"] },
