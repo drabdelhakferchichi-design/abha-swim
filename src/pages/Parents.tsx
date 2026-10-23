@@ -117,8 +117,8 @@ export default function Parents() {
     }
 
     try {
-      // ✅ استخدام دالة Vercel لإنشاء الحساب تلقائياً
-      const response = await fetch("/api/create-user", {
+      // ✅ استخدام create-user-v2 (الذي يتعامل مع مشاكل JSON)
+      const response = await fetch("/api/create-user-v2", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -129,16 +129,22 @@ export default function Parents() {
           swimmerName: selectedSwimmer.name,
           coachId: selectedSwimmer.coachId || "",
           coachName: selectedSwimmer.coachName || "",
-          ageCategory: selectedSwimmer.ageCategory || "",
-          team: "",
-          points: 0,
         }),
       });
 
-      const data = await response.json();
+      // ⚠️ معالجة الرد (قد يكون فارغاً)
+      let data: { error?: string; success?: boolean } = {};
+      const text = await response.text();
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          throw new Error("خطأ في استجابة السيرفر");
+        }
+      }
 
       if (!response.ok) {
-        throw new Error(data.error || "خطأ في إنشاء الحساب");
+        throw new Error(data.error || `خطأ HTTP ${response.status}`);
       }
 
       setMsg({
@@ -157,7 +163,7 @@ export default function Parents() {
       }, 3000);
     } catch (err: unknown) {
       const error = err as { message?: string };
-      setMsg({ type: "error", text: error.message || "خطأ في الاتصال بالسيرفر" });
+      setMsg({ type: "error", text: error.message || "خطأ في الاتصال" });
     }
     setLoading(false);
   };
