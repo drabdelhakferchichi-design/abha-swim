@@ -8,6 +8,10 @@ interface MenuItem {
   roles: Role[];
 }
 
+interface SidebarProps {
+  onClose?: () => void;
+}
+
 const menuItems: MenuItem[] = [
   { to: "/",              label: "لوحة التحكم",       icon: "📊", roles: ["admin", "coach", "swimmer", "parent"] },
   { to: "/users",         label: "المستخدمون",        icon: "👥", roles: ["admin"] },
@@ -31,7 +35,7 @@ const roleLabels: Record<Role, string> = {
   parent:  "ولي أمر",
 };
 
-export default function Sidebar() {
+export default function Sidebar({ onClose }: SidebarProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -42,12 +46,16 @@ export default function Sidebar() {
     navigate("/login");
   };
 
+  const handleLinkClick = () => {
+    if (onClose) onClose();
+  };
+
   const visibleItems = menuItems.filter((item) => item.roles.includes(user.role));
 
   return (
-    <aside className="w-64 bg-white border-l border-gray-200 flex flex-col h-screen sticky top-0">
+    <aside className="w-64 bg-white border-l border-gray-200 flex flex-col h-screen">
       {/* الشعار */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-gray-200 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <img
             src="/images/logo.png"
@@ -59,6 +67,16 @@ export default function Sidebar() {
             <p className="text-xs text-gray-500">{roleLabels[user.role]}</p>
           </div>
         </div>
+        {/* زر الإغلاق في الجوال */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="lg:hidden text-gray-500 text-2xl p-1"
+            aria-label="إغلاق"
+          >
+            ×
+          </button>
+        )}
       </div>
 
       {/* المستخدم */}
@@ -75,6 +93,7 @@ export default function Sidebar() {
               <NavLink
                 to={item.to}
                 end={item.to === "/"}
+                onClick={handleLinkClick}
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${
                     isActive
