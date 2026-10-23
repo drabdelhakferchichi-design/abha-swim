@@ -15,10 +15,11 @@ const menuItems: MenuItem[] = [
   { to: "/parents",       label: "أولياء الأمور", icon: "👨‍👦", roles: ["admin"] },
   { to: "/news",          label: "المستجدات",     icon: "📢", roles: ["admin", "coach", "swimmer", "parent"] },
   { to: "/messages",      label: "التواصل",       icon: "💬", roles: ["admin", "coach", "parent"] },
-{ to: "/reports",       label: "التقارير",      icon: "📊", roles: ["admin", "coach", "parent"] },
+{ to: "/reports",       label: "التقارير",      icon: "📊", roles: ["admin", "coach", "parent"] },  
   { to: "/trainings",     label: "جدول التمارين", icon: "📅", roles: ["admin", "coach", "swimmer", "parent"] },
   { to: "/times",         label: "الأرقام والأزمنة", icon: "⏱️", roles: ["admin", "coach", "swimmer", "parent"] },
   { to: "/competitions",  label: "البطولات",      icon: "🏆", roles: ["admin", "coach", "swimmer", "parent"] },
+  { to: "/qualifying",    label: "الأرقام التأهيلية", icon: "🎯", roles: ["admin", "coach", "parent"] },
   { to: "/settings",      label: "الإعدادات",     icon: "⚙️", roles: ["admin", "coach", "swimmer", "parent"] },
 ];
 
