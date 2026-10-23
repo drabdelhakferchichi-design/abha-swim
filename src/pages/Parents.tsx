@@ -4,6 +4,7 @@ import {
   query,
   where,
   onSnapshot,
+  setDoc,
   updateDoc,
   deleteDoc,
   doc,
@@ -26,9 +27,6 @@ interface Parent {
 interface Swimmer {
   id: string;
   name: string;
-  ageCategory: string;
-  coachId: string;
-  coachName: string;
 }
 
 export default function Parents() {
@@ -75,13 +73,7 @@ export default function Parents() {
       snap.forEach((d) => {
         const data = d.data();
         if (!data.parentUid) {
-          items.push({
-            id: d.id,
-            name: data.name || "",
-            ageCategory: data.ageCategory || "",
-            coachId: data.coachId || "",
-            coachName: data.coachName || "",
-          });
+          items.push({ id: d.id, name: data.name || "" });
         }
       });
       setFreeSwimmers(items);
@@ -101,7 +93,7 @@ export default function Parents() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!user || !name.trim() || !username.trim() || !password.trim() || !swimmerId) {
+    if (!name.trim() || !username.trim() || !password.trim() || !swimmerId) {
       setMsg({ type: "error", text: "املأ جميع الحقول المطلوبة" });
       return;
     }
@@ -110,46 +102,34 @@ export default function Parents() {
     setMsg({ type: "", text: "" });
 
     const selectedSwimmer = freeSwimmers.find((s) => s.id === swimmerId);
-    if (!selectedSwimmer) {
-      setMsg({ type: "error", text: "لم يتم العثور على السباح" });
-      setLoading(false);
-      return;
-    }
+    const tempParentUid = `parent_${Date.now()}`;
 
     try {
-      // ✅ استخدام create-user-v2 (الذي يتعامل مع مشاكل JSON)
-      const response = await fetch("/api/create-user-v2", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: username.trim(),
-          password: password,
-          email: email.trim() || "",
-          parentName: name.trim(),
-          swimmerName: selectedSwimmer.name,
-          coachId: selectedSwimmer.coachId || "",
-          coachName: selectedSwimmer.coachName || "",
-        }),
+      // ✅ حفظ ولي الأمر مباشرة في Firestore
+      await setDoc(doc(db, "users", tempParentUid), {
+        uid: tempParentUid,
+        username: username.trim(),
+        email: email.trim() || null,
+        name: name.trim(),
+        role: "parent",
+        swimmerId,
+        swimmerName: selectedSwimmer?.name || "",
+        tempPassword: password,
+        needsAuthAccount: true,
+        createdBy: user?.uid || "",
       });
 
-      // ⚠️ معالجة الرد (قد يكون فارغاً)
-      let data: { error?: string; success?: boolean } = {};
-      const text = await response.text();
-      if (text) {
-        try {
-          data = JSON.parse(text);
-        } catch {
-          throw new Error("خطأ في استجابة السيرفر");
-        }
-      }
-
-      if (!response.ok) {
-        throw new Error(data.error || `خطأ HTTP ${response.status}`);
+      // ✅ ربط السباح بولي الأمر
+      if (selectedSwimmer) {
+        await updateDoc(doc(db, "swimmers", swimmerId), {
+          parentUid: tempParentUid,
+          parentName: name.trim(),
+        });
       }
 
       setMsg({
         type: "success",
-        text: `✅ تم إنشاء حساب ولي الأمر وربطه بـ "${selectedSwimmer.name}" تلقائياً`,
+        text: `✅ تم حفظ ولي الأمر وربطه بـ "${selectedSwimmer?.name}"\n⚠️ الحساب يحتاج تفعيل يدوياً في Firebase Auth`,
       });
 
       setName("");
@@ -163,7 +143,7 @@ export default function Parents() {
       }, 3000);
     } catch (err: unknown) {
       const error = err as { message?: string };
-      setMsg({ type: "error", text: error.message || "خطأ في الاتصال" });
+      setMsg({ type: "error", text: error.message || "خطأ في الحفظ" });
     }
     setLoading(false);
   };
@@ -180,7 +160,6 @@ export default function Parents() {
       await deleteDoc(doc(db, "users", parent.uid));
     } catch (err) {
       console.error(err);
-      alert("خطأ في الحذف");
     }
   };
 
@@ -209,7 +188,7 @@ export default function Parents() {
       {freeSwimmers.length === 0 && !showForm && (
         <div className="card mb-4 bg-yellow-50 border-yellow-200">
           <p className="text-sm text-yellow-800">
-            ⚠️ لا يوجد سباحون بدون ولي أمر. أضف سباحين أولاً من صفحة "السباحون".
+            ⚠️ لا يوجد سباحون بدون ولي أمر. أضف سباحين أولاً.
           </p>
         </div>
       )}
@@ -228,7 +207,7 @@ export default function Parents() {
               <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="input" dir="ltr" placeholder="ex: ahmed_dad" required />
             </div>
             <div>
-              <label className="block text-sm font-semibold mb-1">كلمة المرور المؤقتة *</label>
+              <label className="block text-sm font-semibold mb-1">كلمة المرور *</label>
               <div className="flex gap-2">
                 <input type="text" value={password} onChange={(e) => setPassword(e.target.value)} className="input" dir="ltr" required />
                 <button type="button" onClick={generatePassword} className="btn-gold whitespace-nowrap">🎲</button>
@@ -236,21 +215,18 @@ export default function Parents() {
             </div>
             <div>
               <label className="block text-sm font-semibold mb-1">الإيميل (اختياري)</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input" dir="ltr" placeholder="للاسترجاع" />
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input" dir="ltr" />
             </div>
           </div>
 
           <div className="border-t pt-4">
-            <label className="block text-sm font-semibold mb-2">🔗 اختر السباح (ابنه) *</label>
+            <label className="block text-sm font-semibold mb-2">🔗 اختر السباح *</label>
             <select value={swimmerId} onChange={(e) => setSwimmerId(e.target.value)} className="input" required>
               {freeSwimmers.length === 0 && <option value="">لا يوجد سباحون متاحون</option>}
               {freeSwimmers.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
-            <p className="text-xs text-gray-500 mt-1">
-              يظهر هنا فقط السباحون الذين ليس لهم ولي أمر بعد
-            </p>
           </div>
 
           {msg.text && (
@@ -275,7 +251,7 @@ export default function Parents() {
       )}
 
       <div className="card mb-4">
-        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} className="input" placeholder="🔍 ابحث بالاسم أو اسم المستخدم..." />
+        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} className="input" placeholder="🔍 ابحث..." />
       </div>
 
       {filtered.length === 0 ? (
@@ -320,10 +296,6 @@ export default function Parents() {
           </table>
         </div>
       )}
-
-      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
-        ℹ️ <strong>مهم</strong> : يجب إنشاء حساب Firebase Auth يدوياً لكل ولي أمر من Firebase Console → Authentication إذا لم يُفعّل تلقائياً.
-      </div>
     </Layout>
   );
 }
