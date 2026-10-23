@@ -9,18 +9,19 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
-  { to: "/",              label: "لوحة التحكم",   icon: "📊", roles: ["admin", "coach", "swimmer", "parent"] },
-  { to: "/users",         label: "المستخدمون",    icon: "👥", roles: ["admin"] },
-  { to: "/swimmers",      label: "السباحون",      icon: "🏊", roles: ["admin", "coach"] },
-  { to: "/parents",       label: "أولياء الأمور", icon: "👨‍👦", roles: ["admin"] },
-  { to: "/news",          label: "المستجدات",     icon: "📢", roles: ["admin", "coach", "swimmer", "parent"] },
-  { to: "/messages",      label: "التواصل",       icon: "💬", roles: ["admin", "coach", "parent"] },
-{ to: "/reports",       label: "التقارير",      icon: "📊", roles: ["admin", "coach", "parent"] },  
-  { to: "/trainings",     label: "جدول التمارين", icon: "📅", roles: ["admin", "coach", "swimmer", "parent"] },
-  { to: "/times",         label: "الأرقام والأزمنة", icon: "⏱️", roles: ["admin", "coach", "swimmer", "parent"] },
-  { to: "/competitions",  label: "البطولات",      icon: "🏆", roles: ["admin", "coach", "swimmer", "parent"] },
+  { to: "/",              label: "لوحة التحكم",       icon: "📊", roles: ["admin", "coach", "swimmer", "parent"] },
+  { to: "/users",         label: "المستخدمون",        icon: "👥", roles: ["admin"] },
+  { to: "/swimmers",      label: "السباحون",          icon: "🏊", roles: ["admin", "coach"] },
+  { to: "/parents",       label: "أولياء الأمور",     icon: "👨‍👦", roles: ["admin"] },
+  { to: "/coaches",       label: "المدربون",          icon: "👨‍🏫", roles: ["admin"] },
   { to: "/qualifying",    label: "الأرقام التأهيلية", icon: "🎯", roles: ["admin", "coach", "parent"] },
-  { to: "/settings",      label: "الإعدادات",     icon: "⚙️", roles: ["admin", "coach", "swimmer", "parent"] },
+  { to: "/news",          label: "المستجدات",         icon: "📢", roles: ["admin", "coach", "swimmer", "parent"] },
+  { to: "/messages",      label: "التواصل",           icon: "💬", roles: ["admin", "coach", "parent"] },
+  { to: "/reports",       label: "التقارير",          icon: "📊", roles: ["admin", "coach", "parent"] },
+  { to: "/trainings",     label: "جدول التمارين",     icon: "📅", roles: ["admin", "coach", "swimmer", "parent"] },
+  { to: "/times",         label: "الأرقام والأزمنة",  icon: "⏱️", roles: ["admin", "coach", "swimmer", "parent"] },
+  { to: "/competitions",  label: "البطولات",          icon: "🏆", roles: ["admin", "coach", "swimmer", "parent"] },
+  { to: "/settings",      label: "الإعدادات",         icon: "⚙️", roles: ["admin", "coach", "swimmer", "parent"] },
 ];
 
 const roleLabels: Record<Role, string> = {
@@ -48,9 +49,11 @@ export default function Sidebar() {
       {/* الشعار */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-abha-green rounded-full flex items-center justify-center">
-            <span className="text-white text-xl font-bold">أ</span>
-          </div>
+          <img
+            src="/images/logo.png"
+            alt="شعار أبها"
+            className="w-12 h-12 object-contain"
+          />
           <div>
             <h1 className="font-bold text-abha-green text-sm">نادي أبها للسباحة</h1>
             <p className="text-xs text-gray-500">{roleLabels[user.role]}</p>
@@ -61,7 +64,7 @@ export default function Sidebar() {
       {/* المستخدم */}
       <div className="p-4 border-b border-gray-200 bg-abha-bg">
         <p className="text-sm font-semibold text-gray-700">{user.name || "بدون اسم"}</p>
-        <p className="text-xs text-gray-500 mt-1">{user.email}</p>
+        <p className="text-xs text-gray-500 mt-1" dir="ltr">{user.email}</p>
       </div>
 
       {/* القائمة */}
