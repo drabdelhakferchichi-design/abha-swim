@@ -9,9 +9,30 @@ import {
   onSnapshot,
   orderBy,
 } from "firebase/firestore";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+import { Line } from "react-chartjs-2";
 import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
 import Layout from "../components/Layout";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 interface Swimmer {
   id: string;
@@ -72,7 +93,6 @@ export default function SwimmerDetails() {
     user?.role === "admin" ||
     (user?.role === "coach" && swimmer?.coachId === user.uid);
 
-  // جلب بيانات السباح
   useEffect(() => {
     if (!id) return;
     const unsub = onSnapshot(doc(db, "swimmers", id), (snap) => {
@@ -102,7 +122,6 @@ export default function SwimmerDetails() {
     return () => unsub();
   }, [id]);
 
-  // جلب أزمنة السباح
   useEffect(() => {
     if (!id) return;
     const q = query(
@@ -145,7 +164,6 @@ export default function SwimmerDetails() {
     setSaving(false);
   };
 
-  // تجميع الأزمنة حسب السباق
   const timesByEvent: Record<string, TimeRecord[]> = {};
   times.forEach((t) => {
     if (!timesByEvent[t.event]) timesByEvent[t.event] = [];
@@ -194,7 +212,6 @@ export default function SwimmerDetails() {
         <h1 className="text-2xl font-bold text-abha-green">🏊 {swimmer.name}</h1>
       </div>
 
-      {/* البطاقات السريعة */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <div className="card text-center">
           <div className="text-3xl mb-1">📅</div>
@@ -220,7 +237,6 @@ export default function SwimmerDetails() {
         </div>
       </div>
 
-      {/* البيانات التفصيلية */}
       <div className="card mb-6">
         <h2 className="text-lg font-bold text-abha-green mb-4">📋 البيانات التفصيلية</h2>
 
@@ -307,21 +323,73 @@ export default function SwimmerDetails() {
         )}
       </div>
 
-      {/* الأزمنة والتطور */}
       <div className="card">
         <h2 className="text-lg font-bold text-abha-green mb-4">⏱️ الأزمنة والتطور</h2>
 
         {times.length === 0 ? (
           <p className="text-gray-500 text-center py-6">لا توجد أزمنة مسجّلة بعد</p>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-8">
             {Object.keys(timesByEvent).map((event) => {
               const eventTimes = timesByEvent[event];
               const bestTime = Math.min(...eventTimes.map((t) => timeToSeconds(t.time)));
 
+              const sortedForChart = [...eventTimes].sort(
+                (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+              );
+
+              const chartData = {
+                labels: sortedForChart.map((t) => t.date),
+                datasets: [
+                  {
+                    label: event,
+                    data: sortedForChart.map((t) => timeToSeconds(t.time)),
+                    borderColor: "#1B5E20",
+                    backgroundColor: "rgba(27, 94, 32, 0.2)",
+                    tension: 0.3,
+                    pointBackgroundColor: "#C9A227",
+                    pointBorderColor: "#1B5E20",
+                    pointRadius: 5,
+                    pointHoverRadius: 8,
+                  },
+                ],
+              };
+
+              const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                  legend: {
+                    display: false,
+                  },
+                },
+                scales: {
+                  y: {
+                    reverse: true,
+                    title: {
+                      display: true,
+                      text: "الزمن (ثواني)",
+                    },
+                  },
+                  x: {
+                    title: {
+                      display: true,
+                      text: "التاريخ",
+                    },
+                  },
+                },
+              };
+
               return (
-                <div key={event} className="border-b pb-4 last:border-b-0">
+                <div key={event} className="border-b pb-6 last:border-b-0">
                   <h3 className="font-bold text-abha-green mb-2">🏅 {event}</h3>
+
+                  {sortedForChart.length > 1 && (
+                    <div className="bg-white p-3 rounded mb-4" style={{ maxHeight: "300px" }}>
+                      <Line data={chartData} options={chartOptions} />
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                     {eventTimes.map((t) => {
                       const isBest = timeToSeconds(t.time) === bestTime;
