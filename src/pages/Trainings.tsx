@@ -19,10 +19,11 @@ interface Training {
   startTime: string;
   endTime: string;
   location: string;
-  ageCategories: string[];  // ← مصفوفة !
+  ageCategories: string[];
+  content: string;
   notes: string;
   coachName: string;
-  groupId: string;           // ← لربط التمارين المنشأة معاً
+  groupId: string;
   createdAt: Date | null;
 }
 
@@ -43,6 +44,7 @@ export default function Trainings() {
   const [endTime, setEndTime] = useState("18:00");
   const [location, setLocation] = useState(locations[0]);
   const [selectedCats, setSelectedCats] = useState<string[]>(["7-8", "9-10", "11-12"]);
+  const [content, setContent] = useState("");
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
@@ -57,6 +59,7 @@ export default function Trainings() {
           endTime: data.endTime || "",
           location: data.location || "",
           ageCategories: data.ageCategories || (data.ageCategory ? [data.ageCategory] : []),
+          content: data.content || "",
           notes: data.notes || "",
           coachName: data.coachName || "",
           groupId: data.groupId || "",
@@ -93,6 +96,7 @@ export default function Trainings() {
         endTime,
         location,
         ageCategories: selectedCats,
+        content: content.trim(),
         notes: notes.trim(),
         coachName: user.name || user.email,
         createdBy: user.uid,
@@ -101,6 +105,7 @@ export default function Trainings() {
       });
 
       setMsg({ type: "success", text: `✅ تم إضافة التمرين لـ ${selectedCats.length} فئة` });
+      setContent("");
       setNotes("");
 
       setTimeout(() => {
@@ -199,8 +204,19 @@ export default function Trainings() {
               ))}
             </div>
             <p className="text-xs text-gray-500 mt-2">
-              محدد : {selectedCats.length} فئة — سيُضاف التمرين لكل الفئات المحددة
+              محدد : {selectedCats.length} فئة
             </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold mb-1">📋 محتوى الحصة التمرينية</label>
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              className="input"
+              rows={4}
+              placeholder="مثال: تسخين 400م، تمارين تقنية 50م حرة × 8، سرعة 100م × 4..."
+            />
           </div>
 
           <div>
@@ -268,7 +284,7 @@ export default function Trainings() {
                 <h3 className="text-lg font-bold text-abha-green mb-3 border-b pb-2">{d}</h3>
                 <div className="space-y-2">
                   {items.map((t) => (
-                    <div key={t.id} className="flex items-center justify-between p-3 bg-abha-bg rounded-lg">
+                    <div key={t.id} className="flex items-start justify-between p-3 bg-abha-bg rounded-lg">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 flex-wrap">
                           <span className="font-mono text-sm font-bold text-abha-green" dir="ltr">
@@ -283,6 +299,12 @@ export default function Trainings() {
                             </span>
                           ))}
                         </div>
+                        {t.content && (
+                          <div className="mt-2 p-2 bg-white border rounded text-xs">
+                            <p className="font-semibold text-abha-green mb-1">📋 محتوى الحصة :</p>
+                            <p className="text-gray-700 whitespace-pre-wrap">{t.content}</p>
+                          </div>
+                        )}
                         {t.notes && <p className="text-xs text-gray-500 mt-1">📝 {t.notes}</p>}
                         <p className="text-xs text-gray-400 mt-1">👨‍🏫 {t.coachName}</p>
                       </div>
