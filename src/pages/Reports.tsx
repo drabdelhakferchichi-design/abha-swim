@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, useRef } from "react";
 import {
   collection,
   addDoc,
@@ -9,6 +9,8 @@ import {
   deleteDoc,
   doc,
 } from "firebase/firestore";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
 import Layout from "../components/Layout";
@@ -48,6 +50,7 @@ export default function Reports() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState({ type: "", text: "" });
   const [filterSwimmer, setFilterSwimmer] = useState("all");
+  const reportRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const [swimmerId, setSwimmerId] = useState("");
   const [month, setMonth] = useState(months[new Date().getMonth()]);
@@ -56,7 +59,6 @@ export default function Reports() {
   const [notes, setNotes] = useState("");
   const [achievements, setAchievements] = useState("");
 
-  // جلب السباحين حسب الدور
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "swimmers"), (snap) => {
       const items: Swimmer[] = snap.docs.map((d) => {
@@ -83,7 +85,6 @@ export default function Reports() {
     return () => unsub();
   }, [user, swimmerId]);
 
-  // جلب التقارير
   useEffect(() => {
     const q = query(collection(db, "reports"), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
@@ -162,6 +163,46 @@ export default function Reports() {
       await deleteDoc(doc(db, "reports", id));
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  // ✅ تصدير التقرير كـ PDF
+  const handleExportPDF = async (reportId: string, swimmerName: string, month: string) => {
+    const el = reportRefs.current[reportId];
+    if (!el) return;
+
+    try {
+      // إضافة نمط مؤقت للطباعة
+      const originalStyle = el.style.cssText;
+      el.style.padding = "20px";
+      el.style.background = "#ffffff";
+
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+      });
+
+      el.style.cssText = originalStyle;
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      // إضافة الشعار والعنوان
+      pdf.setFontSize(20);
+      pdf.text("Abha Swim Club", pdfWidth / 2, 15, { align: "center" });
+      pdf.setFontSize(14);
+      pdf.text("Monthly Report", pdfWidth / 2, 25, { align: "center" });
+
+      pdf.addImage(imgData, "PNG", 10, 35, pdfWidth - 20, pdfHeight);
+
+      // حفظ الملف
+      pdf.save(`تقرير-${swimmerName}-${month}.pdf`);
+    } catch (err) {
+      console.error(err);
+      alert("خطأ في تصدير PDF");
     }
   };
 
@@ -294,7 +335,11 @@ export default function Reports() {
       ) : (
         <div className="space-y-4">
           {filtered.map((r) => (
-            <div key={r.id} className="card">
+            <div
+              key={r.id}
+              ref={(el) => { reportRefs.current[r.id] = el; }}
+              className="card"
+            >
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <h3 className="text-lg font-bold text-abha-green">{r.swimmerName}</h3>
@@ -304,6 +349,13 @@ export default function Reports() {
                   <span className={`px-2 py-1 rounded text-xs font-semibold ${ratingColor(r.rating)}`}>
                     {r.rating}
                   </span>
+                  <button
+                    onClick={() => handleExportPDF(r.id, r.swimmerName, r.month)}
+                    className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600"
+                    title="تحميل PDF"
+                  >
+                    📄 PDF
+                  </button>
                   {canEdit && (
                     <button onClick={() => handleDelete(r.id)} className="text-red-500 hover:text-red-700">🗑️</button>
                   )}
