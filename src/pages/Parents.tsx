@@ -4,11 +4,9 @@ import {
   query,
   where,
   onSnapshot,
-  serverTimestamp,
   updateDoc,
   deleteDoc,
   doc,
-  setDoc,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
@@ -28,6 +26,9 @@ interface Parent {
 interface Swimmer {
   id: string;
   name: string;
+  ageCategory: string;
+  coachId: string;
+  coachName: string;
 }
 
 export default function Parents() {
@@ -74,7 +75,13 @@ export default function Parents() {
       snap.forEach((d) => {
         const data = d.data();
         if (!data.parentUid) {
-          items.push({ id: d.id, name: data.name || "" });
+          items.push({
+            id: d.id,
+            name: data.name || "",
+            ageCategory: data.ageCategory || "",
+            coachId: data.coachId || "",
+            coachName: data.coachName || "",
+          });
         }
       });
       setFreeSwimmers(items);
@@ -94,7 +101,7 @@ export default function Parents() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !username.trim() || !password.trim() || !swimmerId) {
+    if (!user || !name.trim() || !username.trim() || !password.trim() || !swimmerId) {
       setMsg({ type: "error", text: "املأ جميع الحقول المطلوبة" });
       return;
     }
@@ -103,33 +110,40 @@ export default function Parents() {
     setMsg({ type: "", text: "" });
 
     const selectedSwimmer = freeSwimmers.find((s) => s.id === swimmerId);
-    const tempParentUid = `parent_${Date.now()}`;
+    if (!selectedSwimmer) {
+      setMsg({ type: "error", text: "لم يتم العثور على السباح" });
+      setLoading(false);
+      return;
+    }
 
     try {
-      await setDoc(doc(db, "users", tempParentUid), {
-        uid: tempParentUid,
-        username: username.trim(),
-        email: email.trim() || null,
-        name: name.trim(),
-        role: "parent",
-        swimmerId,
-        swimmerName: selectedSwimmer?.name || "",
-        tempPassword: password,
-        needsAuthAccount: true,
-        createdBy: user?.uid || "",
-        createdAt: serverTimestamp(),
+      // ✅ استخدام دالة Vercel لإنشاء الحساب تلقائياً
+      const response = await fetch("/api/create-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: username.trim(),
+          password: password,
+          email: email.trim() || "",
+          parentName: name.trim(),
+          swimmerName: selectedSwimmer.name,
+          coachId: selectedSwimmer.coachId || "",
+          coachName: selectedSwimmer.coachName || "",
+          ageCategory: selectedSwimmer.ageCategory || "",
+          team: "",
+          points: 0,
+        }),
       });
 
-      if (selectedSwimmer) {
-        await updateDoc(doc(db, "swimmers", swimmerId), {
-          parentUid: tempParentUid,
-          parentName: name.trim(),
-        });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "خطأ في إنشاء الحساب");
       }
 
       setMsg({
         type: "success",
-        text: `✅ تم حفظ ولي الأمر وربطه بـ "${selectedSwimmer?.name}"\n⚠️ الحساب يحتاج تفعيل يدوياً من Firebase Console`,
+        text: `✅ تم إنشاء حساب ولي الأمر وربطه بـ "${selectedSwimmer.name}" تلقائياً`,
       });
 
       setName("");
@@ -140,10 +154,10 @@ export default function Parents() {
       setTimeout(() => {
         setShowForm(false);
         setMsg({ type: "", text: "" });
-      }, 4000);
+      }, 3000);
     } catch (err: unknown) {
       const error = err as { message?: string };
-      setMsg({ type: "error", text: error.message || "خطأ في الحفظ" });
+      setMsg({ type: "error", text: error.message || "خطأ في الاتصال بالسيرفر" });
     }
     setLoading(false);
   };
@@ -302,7 +316,7 @@ export default function Parents() {
       )}
 
       <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
-        ℹ️ <strong>مهم</strong> : يجب إنشاء حساب Firebase Auth يدوياً لكل ولي أمر من Firebase Console → Authentication.
+        ℹ️ <strong>مهم</strong> : يجب إنشاء حساب Firebase Auth يدوياً لكل ولي أمر من Firebase Console → Authentication إذا لم يُفعّل تلقائياً.
       </div>
     </Layout>
   );
