@@ -458,26 +458,12 @@ export default function SwimmerDetails() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-semibold mb-1">تاريخ الميلاد</label>
-            <input
-              type="date"
-              value={birthDate}
-              onChange={(e) => setBirthDate(e.target.value)}
-              className="input"
-              dir="ltr"
-              disabled={!canEdit}
-            />
+            <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} className="input" dir="ltr" disabled={!canEdit} />
           </div>
           <div>
             <label className="block text-sm font-semibold mb-1">الفئة العمرية</label>
-            <select
-              value={ageCategory}
-              onChange={(e) => setAgeCategory(e.target.value)}
-              className="input"
-              disabled={!canEdit}
-            >
-              {ageCategoriesList.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
+            <select value={ageCategory} onChange={(e) => setAgeCategory(e.target.value)} className="input" disabled={!canEdit}>
+              {ageCategoriesList.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
         </div>
@@ -498,6 +484,68 @@ export default function SwimmerDetails() {
             placeholder="رقم شخصي، بطولات..."
           />
         </div>
+      </div>
+
+      {/* ✅ قسم الإحصائيات */}
+      <div className="card mb-6">
+        <h2 className="text-lg font-bold text-abha-green mb-4">📊 إحصائيات سريعة</h2>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="text-center p-3 bg-abha-bg rounded-lg">
+            <div className="text-3xl mb-1">⏱️</div>
+            <div className="text-2xl font-bold text-abha-green">{times.length}</div>
+            <div className="text-xs text-gray-500">زمن مسجّل</div>
+          </div>
+          <div className="text-center p-3 bg-abha-bg rounded-lg">
+            <div className="text-3xl mb-1">🏅</div>
+            <div className="text-2xl font-bold text-abha-gold">{Object.keys(timesByEvent).length}</div>
+            <div className="text-xs text-gray-500">نوع سباق</div>
+          </div>
+          <div className="text-center p-3 bg-abha-bg rounded-lg">
+            <div className="text-3xl mb-1">🎯</div>
+            <div className="text-2xl font-bold text-blue-600">{actualSpecialties.length}</div>
+            <div className="text-xs text-gray-500">تخصص</div>
+          </div>
+          <div className="text-center p-3 bg-abha-bg rounded-lg">
+            <div className="text-3xl mb-1">⭐</div>
+            <div className="text-2xl font-bold text-purple-600">{swimmer.points}</div>
+            <div className="text-xs text-gray-500">نقطة</div>
+          </div>
+        </div>
+
+        {Object.keys(timesByEvent).length > 0 && (
+          <div className="mt-4">
+            <h3 className="font-semibold text-abha-green mb-2">🏆 أفضل الأرقام الشخصية</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {Object.keys(timesByEvent).map((event) => {
+                const eventTimes = timesByEvent[event];
+                const bestTime = Math.min(...eventTimes.map((t) => timeToSeconds(t.time)));
+                const bestRecord = eventTimes.find((t) => timeToSeconds(t.time) === bestTime);
+                return (
+                  <div key={event} className="flex items-center justify-between p-2 bg-yellow-50 border-r-4 border-abha-gold rounded">
+                    <div>
+                      <p className="text-sm font-semibold">{event}</p>
+                      <p className="text-xs text-gray-500">{bestRecord?.date || ""}</p>
+                    </div>
+                    <span className="bg-abha-gold text-white px-2 py-1 rounded font-mono font-bold text-sm">
+                      {bestRecord?.time}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {actualSpecialties.length > 0 && (
+          <div className="mt-4 p-3 bg-gradient-to-br from-abha-green/10 to-abha-gold/10 rounded-lg">
+            <p className="text-sm text-gray-600">🎯 التخصص الأساسي :</p>
+            <p className="text-lg font-bold text-abha-green">
+              {actualSpecialties[0].stroke} {actualSpecialties[0].distance}
+              <span className="text-sm mr-2">({actualSpecialties[0].percent}%)</span>
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="card mb-6">
@@ -566,21 +614,8 @@ export default function SwimmerDetails() {
           <div className="bg-abha-bg p-3 rounded-lg mb-4">
             <h3 className="text-sm font-semibold mb-2">➕ إضافة فيديو YouTube</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
-              <input
-                type="text"
-                value={newVideoTitle}
-                onChange={(e) => setNewVideoTitle(e.target.value)}
-                className="input text-sm"
-                placeholder="عنوان الفيديو..."
-              />
-              <input
-                type="url"
-                value={newVideoUrl}
-                onChange={(e) => setNewVideoUrl(e.target.value)}
-                className="input text-sm"
-                dir="ltr"
-                placeholder="https://youtube.com/watch?v=..."
-              />
+              <input type="text" value={newVideoTitle} onChange={(e) => setNewVideoTitle(e.target.value)} className="input text-sm" placeholder="عنوان الفيديو..." />
+              <input type="url" value={newVideoUrl} onChange={(e) => setNewVideoUrl(e.target.value)} className="input text-sm" dir="ltr" placeholder="https://youtube.com/watch?v=..." />
             </div>
             <button onClick={handleAddVideo} className="btn-gold text-sm">➕ إضافة</button>
           </div>
@@ -595,12 +630,7 @@ export default function SwimmerDetails() {
               return (
                 <div key={idx} className="border rounded-lg overflow-hidden">
                   {ytId && (
-                    <iframe
-                      src={`https://www.youtube.com/embed/${ytId}`}
-                      className="w-full aspect-video"
-                      allowFullScreen
-                      title={v.title}
-                    />
+                    <iframe src={`https://www.youtube.com/embed/${ytId}`} className="w-full aspect-video" allowFullScreen title={v.title} />
                   )}
                   <div className="p-2 flex items-center justify-between bg-abha-bg">
                     <p className="text-sm font-semibold">{v.title}</p>
