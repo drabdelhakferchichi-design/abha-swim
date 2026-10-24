@@ -142,9 +142,12 @@ export default function SwimmerDetails() {
   const [reportAchievements, setReportAchievements] = useState("");
   const [reportSaving, setReportSaving] = useState(false);
 
+  // ✅ المدرب فقط يمكنه التعديل (وليس أبو ناصر)
   const canEdit =
-    user?.role === "admin" ||
-    (user?.role === "coach" && swimmer?.coachId === user.uid);
+    user?.role === "coach" && swimmer?.coachId === user.uid;
+
+  // ✅ أبو ناصر يرى فقط (بدون تعديل)
+  const isReadOnly = user?.role === "admin";
 
   useEffect(() => {
     if (!id) return;
@@ -371,6 +374,9 @@ export default function SwimmerDetails() {
             ← رجوع
           </button>
           <h1 className="text-2xl font-bold text-abha-green">🏊 {swimmer.name}</h1>
+          {isReadOnly && (
+            <p className="text-xs text-gray-500 mt-1">👁️ عرض فقط (كما أدخله المدرب)</p>
+          )}
         </div>
         {canEdit && (
           <button
