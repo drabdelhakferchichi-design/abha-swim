@@ -13,7 +13,9 @@ interface SidebarProps {
 }
 
 const menuItems: MenuItem[] = [
+ { to: "/search",        label: "البحث الشامل",      icon: "🔍", roles: ["admin", "coach", "parent"] },
   { to: "/",              label: "لوحة التحكم",       icon: "📊", roles: ["admin", "coach", "swimmer", "parent"] },
+
   { to: "/users",         label: "المستخدمون",        icon: "👥", roles: ["admin"] },
   { to: "/swimmers",      label: "السباحون",          icon: "🏊", roles: ["admin", "coach"] },
   { to: "/parents",       label: "أولياء الأمور",     icon: "👨‍👦", roles: ["admin"] },

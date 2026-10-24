@@ -14,6 +14,7 @@ import Competitions from "./pages/Competitions";
 import SwimmerDetails from "./pages/SwimmerDetails";
 import Qualifying from "./pages/Qualifying";
 import Meetings from "./pages/Meetings";
+import Search from "./pages/Search";
 import Settings from "./pages/Settings";
 import Guide from "./pages/Guide";
 
@@ -54,6 +55,7 @@ function AppRoutes() {
       <Route path="/swimmers/:id" element={<ProtectedRoute><SwimmerDetails /></ProtectedRoute>} />
       <Route path="/qualifying" element={<ProtectedRoute><Qualifying /></ProtectedRoute>} />
       <Route path="/meetings" element={<ProtectedRoute><Meetings /></ProtectedRoute>} />
+      <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/guide" element={<ProtectedRoute><Guide /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
