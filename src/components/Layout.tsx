@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import { useAuth } from "../context/AuthContext";
 import { useNotifications } from "../hooks/useNotifications";
@@ -10,8 +11,12 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // ✅ تفعيل الإشعارات تلقائياً
+  // ✅ زر الرجوع يظهر فقط في الصفحات الفرعية (وليس الرئيسية أو login)
+  const canGoBack = location.pathname !== "/" && location.pathname !== "/login";
+
   const { permission, requestPermission } = useNotifications({
     userId: user?.uid,
     enabled: true,
@@ -56,7 +61,7 @@ export default function Layout({ children }: LayoutProps) {
           <div className="w-8"></div>
         </div>
 
-        {/* شريط الإشعارات (إذا لم يُفعّل) */}
+        {/* شريط الإشعارات */}
         {permission === "default" && (
           <div className="bg-abha-gold text-white p-3 text-sm flex items-center justify-between shadow">
             <span>🔔 فعّل الإشعارات لتصلك المستجدات والرسائل</span>
@@ -69,7 +74,19 @@ export default function Layout({ children }: LayoutProps) {
           </div>
         )}
 
-        <div className="max-w-7xl mx-auto p-3 sm:p-6">{children}</div>
+        <div className="max-w-7xl mx-auto p-3 sm:p-6">
+          {/* ✅ زر الرجوع */}
+          {canGoBack && (
+            <button
+              onClick={() => navigate(-1)}
+              className="mb-4 flex items-center gap-2 text-sm text-gray-600 hover:text-abha-green transition bg-white px-3 py-2 rounded-lg shadow-sm"
+            >
+              <span className="text-lg">←</span>
+              <span>رجوع</span>
+            </button>
+          )}
+          {children}
+        </div>
       </main>
     </div>
   );
