@@ -80,6 +80,8 @@ const distancesByStroke: Record<string, string[]> = {
   "متنوع": ["200م", "400م"],
 };
 
+const ageCategoriesList = ["7-8", "9-10", "11-12", "13-14", "15-17", "عمومي"];
+
 const ratings = ["ممتاز", "جيد جداً", "جيد", "يحتاج تحسين"];
 const months = [
   "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
@@ -120,6 +122,7 @@ export default function SwimmerDetails() {
   const [msg, setMsg] = useState({ type: "", text: "" });
 
   const [birthDate, setBirthDate] = useState("");
+  const [ageCategory, setAgeCategory] = useState("");
   const [achievements, setAchievements] = useState("");
   const [specialties, setSpecialties] = useState<Specialty[]>([
     { stroke: "غير محدد", distance: "", percent: 0 },
@@ -177,6 +180,7 @@ export default function SwimmerDetails() {
         };
         setSwimmer(s);
         setBirthDate(s.birthDate);
+        setAgeCategory(s.ageCategory || "7-8");
         setAchievements(s.achievements);
         setSpecialties(s.specialties);
         setVideos(s.videos);
@@ -237,6 +241,7 @@ export default function SwimmerDetails() {
     try {
       await updateDoc(doc(db, "swimmers", id), {
         birthDate,
+        ageCategory,
         achievements: achievements.trim(),
         specialties: validSpecialties,
         videos,
@@ -453,12 +458,33 @@ export default function SwimmerDetails() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-semibold mb-1">تاريخ الميلاد</label>
-            <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} className="input" dir="ltr" disabled={!canEdit} />
+            <input
+              type="date"
+              value={birthDate}
+              onChange={(e) => setBirthDate(e.target.value)}
+              className="input"
+              dir="ltr"
+              disabled={!canEdit}
+            />
           </div>
           <div>
-            <label className="block text-sm font-semibold mb-1">المدرب</label>
-            <input type="text" value={swimmer.coachName || "-"} className="input bg-gray-50" disabled />
+            <label className="block text-sm font-semibold mb-1">الفئة العمرية</label>
+            <select
+              value={ageCategory}
+              onChange={(e) => setAgeCategory(e.target.value)}
+              className="input"
+              disabled={!canEdit}
+            >
+              {ageCategoriesList.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
           </div>
+        </div>
+
+        <div className="mt-4">
+          <label className="block text-sm font-semibold mb-1">المدرب</label>
+          <input type="text" value={swimmer.coachName || "-"} className="input bg-gray-50" disabled />
         </div>
 
         <div className="mt-4">
