@@ -27,6 +27,7 @@ const menuItems: MenuItem[] = [
   { to: "/competitions",  label: "البطولات",          icon: "🏆", roles: ["admin", "coach", "swimmer", "parent"] },
   { to: "/settings",      label: "الإعدادات",         icon: "⚙️", roles: ["admin", "coach", "swimmer", "parent"] },
   { to: "/guide",         label: "دليل الاستخدام",    icon: "📖", roles: ["admin", "coach", "parent"] },
+  { to: "/meetings",      label: "اجتماعات Zoom", icon: "📹", roles: ["admin", "coach", "parent", "swimmer"] },
 ];
 
 const roleLabels: Record<Role, string> = {
