@@ -49,7 +49,9 @@ export default function Swimmers() {
   const [points, setPoints] = useState(0);
   const [coachId, setCoachId] = useState("");
 
+  // ✅ جلب السباحين مع فلترة حسب الدور
   useEffect(() => {
+    if (!user) return;
     const q = query(collection(db, "swimmers"), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
       const items: Swimmer[] = snap.docs.map((d) => {
@@ -67,11 +69,21 @@ export default function Swimmers() {
           createdAt: data.createdAt?.toDate() || null,
         };
       });
-      setList(items);
+
+      // ✅ فلترة حسب الدور
+      let allowed = items;
+      if (user.role === "coach") {
+        allowed = items.filter((s) => s.coachId === user.uid);
+      } else if (user.role === "parent") {
+        allowed = items.filter((s) => s.parentUid === user.uid);
+      }
+
+      setList(allowed);
     });
     return () => unsub();
-  }, []);
+  }, [user]);
 
+  // جلب المدربين
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "users"), (snap) => {
       const items: Coach[] = [];
