@@ -208,7 +208,13 @@ export default function Swimmers() {
       )}
 
       <div className="card mb-4">
-        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} className="input" placeholder="🔍 ابحث عن سباح..." />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="input"
+          placeholder="🔍 ابحث عن سباح..."
+        />
       </div>
 
       {filtered.length === 0 ? (
@@ -216,61 +222,105 @@ export default function Swimmers() {
           <p className="text-gray-500">لا يوجد سباحون مسجلون حالياً</p>
         </div>
       ) : (
-        <div className="card overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b-2 border-abha-green text-abha-green">
-                <th className="text-right p-3">الاسم</th>
-                <th className="text-right p-3">الفئة</th>
-                <th className="text-right p-3">الفريق</th>
-                <th className="text-right p-3">النقاط</th>
-                <th className="text-right p-3">المدرب</th>
-                <th className="text-right p-3">ولي الأمر</th>
-                <th className="text-right p-3">إجراءات</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((s) => (
-                <tr key={s.id} className="border-b border-gray-100 hover:bg-abha-bg">
-                  <td className="p-3 font-semibold">{s.name}</td>
-                  <td className="p-3">{s.ageCategory}</td>
-                  <td className="p-3">{s.team || "-"}</td>
-                  <td className="p-3">
-                    <span className="bg-abha-gold text-white px-2 py-1 rounded text-xs font-bold">{s.points}</span>
-                  </td>
-                  <td className="p-3">
-                    <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">{s.coachName || "-"}</span>
-                  </td>
-                  <td className="p-3">
-                    {s.parentName ? (
-                      <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">✅ {s.parentName}</span>
-                    ) : (
-                      <span className="text-gray-400 text-xs">بدون</span>
-                    )}
-                  </td>
-                  <td className="p-3">
-                    <div className="flex gap-2 items-center">
-                      <Link
-                        to={`/swimmers/${s.id}`}
-                        className="text-blue-600 hover:text-blue-800 text-sm"
-                      >
-                        👁️ عرض
-                      </Link>
-                      {isAdmin && (
-                        <button
-                          onClick={() => handleDelete(s.id)}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          🗑️
-                        </button>
-                      )}
-                    </div>
-                  </td>
+        <>
+          {/* ✅ الجدول - يظهر فقط على الشاشات الكبيرة */}
+          <div className="hidden lg:block card overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b-2 border-abha-green text-abha-green">
+                  <th className="text-right p-3">الاسم</th>
+                  <th className="text-right p-3">الفئة</th>
+                  <th className="text-right p-3">الفريق</th>
+                  <th className="text-right p-3">النقاط</th>
+                  <th className="text-right p-3">المدرب</th>
+                  <th className="text-right p-3">ولي الأمر</th>
+                  <th className="text-right p-3">إجراءات</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {filtered.map((s) => (
+                  <tr key={s.id} className="border-b border-gray-100 hover:bg-abha-bg">
+                    <td className="p-3 font-semibold">{s.name}</td>
+                    <td className="p-3">{s.ageCategory}</td>
+                    <td className="p-3">{s.team || "-"}</td>
+                    <td className="p-3">
+                      <span className="bg-abha-gold text-white px-2 py-1 rounded text-xs font-bold">{s.points}</span>
+                    </td>
+                    <td className="p-3">
+                      <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">{s.coachName || "-"}</span>
+                    </td>
+                    <td className="p-3">
+                      {s.parentName ? (
+                        <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">✅ {s.parentName}</span>
+                      ) : (
+                        <span className="text-gray-400 text-xs">بدون</span>
+                      )}
+                    </td>
+                    <td className="p-3">
+                      <div className="flex gap-2 items-center">
+                        <Link to={`/swimmers/${s.id}`} className="text-blue-600 hover:text-blue-800 text-sm">
+                          👁️ عرض
+                        </Link>
+                        {isAdmin && (
+                          <button onClick={() => handleDelete(s.id)} className="text-red-500 hover:text-red-700">🗑️</button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ✅ البطاقات - تظهر فقط على الجوال */}
+          <div className="lg:hidden space-y-3">
+            {filtered.map((s) => (
+              <div key={s.id} className="card">
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <h3 className="text-lg font-bold text-abha-green">{s.name}</h3>
+                    <p className="text-sm text-gray-500">{s.team || "بدون فريق"}</p>
+                  </div>
+                  <span className="bg-abha-gold text-white px-2 py-1 rounded text-xs font-bold">
+                    ⭐ {s.points}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+                  <div>
+                    <span className="text-gray-500 text-xs">الفئة</span>
+                    <p className="font-semibold">{s.ageCategory}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 text-xs">المدرب</span>
+                    <p className="font-semibold text-blue-600">{s.coachName || "-"}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-gray-500 text-xs">ولي الأمر</span>
+                    <p className={`font-semibold ${s.parentName ? "text-green-600" : "text-gray-400"}`}>
+                      {s.parentName ? `✅ ${s.parentName}` : "بدون"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Link
+                    to={`/swimmers/${s.id}`}
+                    className="flex-1 bg-abha-green text-white text-center py-2 rounded-lg text-sm font-semibold hover:bg-abha-greenLight"
+                  >
+                    👁️ عرض
+                  </Link>
+                  {isAdmin && (
+                    <button
+                      onClick={() => handleDelete(s.id)}
+                      className="bg-red-100 text-red-600 px-4 py-2 rounded-lg text-sm hover:bg-red-200"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </Layout>
   );
