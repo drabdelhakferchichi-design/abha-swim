@@ -48,6 +48,17 @@ interface VideoLink {
   url: string;
 }
 
+interface CompetitionEntry {
+  id: string;
+  competitionName: string;
+  date: string;
+  races: string[];
+  gold: number;
+  silver: number;
+  bronze: number;
+  points: number;
+}
+
 interface Swimmer {
   id: string;
   name: string;
@@ -60,6 +71,7 @@ interface Swimmer {
   achievements: string;
   specialties: Specialty[];
   videos: VideoLink[];
+  competitions?: CompetitionEntry[];
 }
 
 interface TimeRecord {
@@ -86,6 +98,14 @@ const ratings = ["ممتاز", "جيد جداً", "جيد", "يحتاج تحسي
 const months = [
   "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
   "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
+];
+
+const allRaces = [
+  "50م حرة", "100م حرة", "200م حرة", "400م حرة", "1500م حرة",
+  "50م ظهر", "100م ظهر", "200م ظهر",
+  "50م صدر", "100م صدر", "200م صدر",
+  "50م فراشة", "100م فراشة", "200م فراشة",
+  "200م متنوع", "400م متنوع",
 ];
 
 function timeToSeconds(time: string): number {
@@ -134,6 +154,10 @@ export default function SwimmerDetails() {
   const [newVideoTitle, setNewVideoTitle] = useState("");
   const [newVideoUrl, setNewVideoUrl] = useState("");
 
+  const [competitions, setCompetitions] = useState<CompetitionEntry[]>([]);
+  const [newCompetitionName, setNewCompetitionName] = useState("");
+  const [newCompetitionDate, setNewCompetitionDate] = useState("");
+
   const [showReportForm, setShowReportForm] = useState(false);
   const [reportMonth, setReportMonth] = useState(months[new Date().getMonth()]);
   const [reportYear, setReportYear] = useState(new Date().getFullYear().toString());
@@ -180,6 +204,7 @@ export default function SwimmerDetails() {
           achievements: data.achievements || "",
           specialties: padded.slice(0, 4),
           videos: data.videos || [],
+          competitions: data.competitions || [],
         };
         setSwimmer(s);
         setBirthDate(s.birthDate);
@@ -187,6 +212,7 @@ export default function SwimmerDetails() {
         setAchievements(s.achievements);
         setSpecialties(s.specialties);
         setVideos(s.videos);
+        setCompetitions(s.competitions || []);
       }
       setLoading(false);
     });
@@ -248,6 +274,7 @@ export default function SwimmerDetails() {
         achievements: achievements.trim(),
         specialties: validSpecialties,
         videos,
+        competitions,
       });
       setMsg({ type: "success", text: "✅ تم الحفظ" });
       setTimeout(() => setMsg({ type: "", text: "" }), 2000);
@@ -613,6 +640,183 @@ export default function SwimmerDetails() {
         )}
       </div>
 
+      {/* 🏆 البطولات */}
+      <div className="card mb-6">
+        <h2 className="text-lg font-bold text-abha-green mb-4">🏆 البطولات والنتائج</h2>
+
+        {canEdit && (
+          <div className="bg-abha-bg p-3 rounded-lg mb-4">
+            <h3 className="text-sm font-semibold mb-2">➕ إضافة بطولة</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
+              <input
+                type="text"
+                value={newCompetitionName}
+                onChange={(e) => setNewCompetitionName(e.target.value)}
+                className="input text-sm sm:col-span-2"
+                placeholder="اسم البطولة (مثلاً: بطولة المملكة 2026)"
+              />
+              <input
+                type="date"
+                value={newCompetitionDate}
+                onChange={(e) => setNewCompetitionDate(e.target.value)}
+                className="input text-sm"
+                dir="ltr"
+              />
+            </div>
+            <button
+              onClick={() => {
+                if (!newCompetitionName.trim()) return;
+                const newComp: CompetitionEntry = {
+                  id: `comp_${Date.now()}`,
+                  competitionName: newCompetitionName.trim(),
+                  date: newCompetitionDate,
+                  races: [],
+                  gold: 0,
+                  silver: 0,
+                  bronze: 0,
+                  points: 0,
+                };
+                setCompetitions([...competitions, newComp]);
+                setNewCompetitionName("");
+                setNewCompetitionDate("");
+              }}
+              className="btn-gold text-sm"
+            >
+              ➕ إضافة بطولة
+            </button>
+          </div>
+        )}
+
+        {competitions.length === 0 ? (
+          <p className="text-center text-gray-500 py-4">لا توجد بطولات مسجّلة</p>
+        ) : (
+          <div className="space-y-3">
+            {competitions.map((comp, cIdx) => (
+              <div key={comp.id} className="border rounded-lg p-3">
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <h3 className="font-bold text-abha-green">{comp.competitionName}</h3>
+                    {comp.date && (
+                      <p className="text-xs text-gray-500" dir="ltr">📅 {comp.date}</p>
+                    )}
+                  </div>
+                  {canEdit && (
+                    <button
+                      onClick={() => {
+                        if (!confirm("حذف هذه البطولة ؟")) return;
+                        setCompetitions(competitions.filter((_, i) => i !== cIdx));
+                      }}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
+
+                {/* السباقات المشارك فيها */}
+                <div className="mb-2">
+                  <p className="text-xs font-semibold text-gray-600 mb-1">🏊 السباقات:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {allRaces.map((race) => (
+                      <button
+                        key={race}
+                        type="button"
+                        disabled={!canEdit}
+                        onClick={() => {
+                          const updated = [...competitions];
+                          const races = [...updated[cIdx].races];
+                          if (races.includes(race)) {
+                            updated[cIdx].races = races.filter((r) => r !== race);
+                          } else {
+                            updated[cIdx].races = [...races, race];
+                          }
+                          setCompetitions(updated);
+                        }}
+                        className={`px-2 py-1 rounded text-xs ${
+                          comp.races.includes(race)
+                            ? "bg-abha-green text-white"
+                            : "bg-gray-100 text-gray-600"
+                        } ${!canEdit ? "opacity-60 cursor-not-allowed" : ""}`}
+                      >
+                        {comp.races.includes(race) ? "✓ " : ""}{race}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* الميداليات والنقاط */}
+                <div className="grid grid-cols-4 gap-2 mt-3">
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">🥇 ذهبية</label>
+                    <input
+                      type="number"
+                      value={comp.gold || ""}
+                      onChange={(e) => {
+                        const updated = [...competitions];
+                        updated[cIdx].gold = Number(e.target.value) || 0;
+                        setCompetitions(updated);
+                      }}
+                      className="input text-sm"
+                      disabled={!canEdit}
+                      min={0}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">🥈 فضية</label>
+                    <input
+                      type="number"
+                      value={comp.silver || ""}
+                      onChange={(e) => {
+                        const updated = [...competitions];
+                        updated[cIdx].silver = Number(e.target.value) || 0;
+                        setCompetitions(updated);
+                      }}
+                      className="input text-sm"
+                      disabled={!canEdit}
+                      min={0}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">🥉 برونزية</label>
+                    <input
+                      type="number"
+                      value={comp.bronze || ""}
+                      onChange={(e) => {
+                        const updated = [...competitions];
+                        updated[cIdx].bronze = Number(e.target.value) || 0;
+                        setCompetitions(updated);
+                      }}
+                      className="input text-sm"
+                      disabled={!canEdit}
+                      min={0}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">⭐ نقاط</label>
+                    <input
+                      type="number"
+                      value={comp.points || ""}
+                      onChange={(e) => {
+                        const updated = [...competitions];
+                        updated[cIdx].points = Number(e.target.value) || 0;
+                        setCompetitions(updated);
+                      }}
+                      className="input text-sm"
+                      disabled={!canEdit}
+                      min={0}
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="card mb-6">
         <h2 className="text-lg font-bold text-abha-green mb-4">🎥 فيديوهات تعليمية</h2>
 
@@ -651,16 +855,22 @@ export default function SwimmerDetails() {
         )}
       </div>
 
-      {canEdit && (
+            {canEdit && (
         <div className="mb-6">
-          <button onClick={handleSave} disabled={saving} className="btn-primary disabled:opacity-50">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="btn-primary disabled:opacity-50"
+          >
             {saving ? "جاري الحفظ..." : "💾 حفظ جميع التعديلات"}
           </button>
         </div>
       )}
 
       <div className="card">
-        <h2 className="text-lg font-bold text-abha-green mb-4">⏱️ الأزمنة والتطور</h2>
+        <h2 className="text-lg font-bold text-abha-green mb-4">
+          ⏱️ الأزمنة والتطور
+        </h2>
 
         {times.length === 0 ? (
           <p className="text-gray-500 text-center py-6">لا توجد أزمنة مسجّلة</p>
@@ -682,20 +892,25 @@ export default function SwimmerDetails() {
                       <Line
                         data={{
                           labels: sortedForChart.map((t) => t.date),
-                          datasets: [{
-                            label: event,
-                            data: sortedForChart.map((t) => timeToSeconds(t.time)),
-                            borderColor: "#1B5E20",
-                            backgroundColor: "rgba(27, 94, 32, 0.2)",
-                            tension: 0.3,
-                            pointBackgroundColor: "#C9A227",
-                          }],
+                          datasets: [
+                            {
+                              label: event,
+                              data: sortedForChart.map((t) => timeToSeconds(t.time)),
+                              borderColor: "#1B5E20",
+                              backgroundColor: "rgba(27, 94, 32, 0.2)",
+                              tension: 0.3,
+                              pointBackgroundColor: "#C9A227",
+                            },
+                          ],
                         }}
                         options={{
                           responsive: true,
                           plugins: { legend: { display: false } },
                           scales: {
-                            y: { reverse: true, title: { display: true, text: "الزمن (ثواني)" } },
+                            y: {
+                              reverse: true,
+                              title: { display: true, text: "الزمن (ثواني)" },
+                            },
                           },
                         }}
                       />
@@ -706,8 +921,15 @@ export default function SwimmerDetails() {
                     {eventTimes.map((t) => {
                       const isBest = timeToSeconds(t.time) === bestTime;
                       return (
-                        <div key={t.id} className={`p-2 rounded text-center ${isBest ? "bg-abha-gold text-white font-bold" : "bg-abha-bg"}`}>
-                          <div className="font-mono text-lg" dir="ltr">{t.time}</div>
+                        <div
+                          key={t.id}
+                          className={`p-2 rounded text-center ${
+                            isBest ? "bg-abha-gold text-white font-bold" : "bg-abha-bg"
+                          }`}
+                        >
+                          <div className="font-mono text-lg" dir="ltr">
+                            {t.time}
+                          </div>
                           <div className="text-xs opacity-80">{t.date || "-"}</div>
                           {isBest && <div className="text-xs mt-1">🏆</div>}
                         </div>
