@@ -51,6 +51,7 @@ export default function CompetitionsManager() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState({ type: "", text: "" });
+  const [showPastCompForm, setShowPastCompForm] = useState(false);
 
   const [newCompName, setNewCompName] = useState("");
   const [newCompDate, setNewCompDate] = useState("");
@@ -87,6 +88,7 @@ export default function CompetitionsManager() {
   }, [user, selectedSwimmerId]);
 
   const canEdit = user?.role === "coach";
+  const isReadOnly = user?.role === "admin" || user?.role === "parent";
   const selectedSwimmer = swimmers.find((s) => s.id === selectedSwimmerId) || null;
   const selectedComp = selectedSwimmer?.competitions?.find((c) => c.id === selectedCompId) || null;
 
@@ -107,7 +109,7 @@ export default function CompetitionsManager() {
     setSaving(false);
   };
 
-  // إضافة بطولة جديدة
+  // إضافة بطولة جديدة (قادمة أو سابقة)
   const addCompetition = () => {
     if (!selectedSwimmer || !newCompName.trim()) return;
     const newComp: Competition = {
@@ -123,14 +125,16 @@ export default function CompetitionsManager() {
     };
     setSwimmers(swimmers.map((s) => (s.id === updated.id ? updated : s)));
     setSelectedCompId(newComp.id);
+    setActiveTab(null);
     setNewCompName("");
     setNewCompDate("");
+    setShowPastCompForm(false);
     saveSwimmer(updated);
   };
 
   // toggle السباق
   const toggleRace = (race: string) => {
-    if (!selectedSwimmer || !selectedComp) return;
+    if (!selectedSwimmer || !selectedComp || !canEdit) return;
     const comps = [...(selectedSwimmer.competitions || [])];
     const idx = comps.findIndex((c) => c.id === selectedComp.id);
     if (idx < 0) return;
@@ -148,7 +152,7 @@ export default function CompetitionsManager() {
 
   // تحديث نتيجة
   const updateResult = (race: string, field: keyof SwimResult, value: string | number) => {
-    if (!selectedSwimmer || !selectedComp) return;
+    if (!selectedSwimmer || !selectedComp || !canEdit) return;
     const comps = [...(selectedSwimmer.competitions || [])];
     const idx = comps.findIndex((c) => c.id === selectedComp.id);
     if (idx < 0) return;
@@ -171,7 +175,7 @@ export default function CompetitionsManager() {
 
   // حذف بطولة
   const deleteCompetition = () => {
-    if (!selectedSwimmer || !selectedComp) return;
+    if (!selectedSwimmer || !selectedComp || !canEdit) return;
     if (!confirm("حذف البطولة ؟")) return;
     const comps = (selectedSwimmer.competitions || []).filter((c) => c.id !== selectedComp.id);
     const updated: Swimmer = { ...selectedSwimmer, competitions: comps };
@@ -179,6 +183,13 @@ export default function CompetitionsManager() {
     setSelectedCompId("");
     setActiveTab(null);
     saveSwimmer(updated);
+  };
+
+  const getMedalEmoji = (medal: string) => {
+    if (medal === "gold") return "🥇";
+    if (medal === "silver") return "🥈";
+    if (medal === "bronze") return "🥉";
+    return "—";
   };
 
   if (loading) {
@@ -194,6 +205,11 @@ export default function CompetitionsManager() {
   return (
     <Layout>
       <h1 className="text-2xl font-bold text-abha-green mb-6">🏆 إدارة البطولات</h1>
+      {isReadOnly && (
+        <p className="text-xs text-gray-500 mb-4">
+          👁️ عرض فقط (كما أدخله المدرب) — للقراءة فقط
+        </p>
+      )}
 
       {msg.text && (
         <div className={`text-sm rounded-lg p-3 mb-4 ${
@@ -234,29 +250,45 @@ export default function CompetitionsManager() {
           <h2 className="font-bold text-abha-green mb-3">🏆 بطولات {selectedSwimmer?.name || ""}</h2>
 
           {canEdit && (
-            <div className="bg-abha-bg p-2 rounded mb-3">
-              <input
-                type="text"
-                value={newCompName}
-                onChange={(e) => setNewCompName(e.target.value)}
-                className="input text-xs mb-1"
-                placeholder="اسم البطولة"
-              />
-              <input
-                type="date"
-                value={newCompDate}
-                onChange={(e) => setNewCompDate(e.target.value)}
-                className="input text-xs mb-1"
-                dir="ltr"
-              />
-              <button onClick={addCompetition} className="btn-gold text-xs w-full">
-                ➕ إضافة
+            <>
+              <button
+                onClick={() => setShowPastCompForm(!showPastCompForm)}
+                className="btn-primary text-xs w-full mb-2"
+              >
+                {showPastCompForm ? "إلغاء" : "➕ إضافة بطولة"}
               </button>
-            </div>
+
+              {showPastCompForm && (
+                <div className="bg-abha-bg p-2 rounded mb-3">
+                  <input
+                    type="text"
+                    value={newCompName}
+                    onChange={(e) => setNewCompName(e.target.value)}
+                    className="input text-xs mb-1"
+                    placeholder="اسم البطولة"
+                  />
+                  <input
+                    type="date"
+                    value={newCompDate}
+                    onChange={(e) => setNewCompDate(e.target.value)}
+                    className="input text-xs mb-1"
+                    dir="ltr"
+                  />
+                  <p className="text-xs text-gray-500 mb-1">
+                    💡 يمكنك اختيار تاريخ قديم للبطولات السابقة
+                  </p>
+                  <button onClick={addCompetition} className="btn-gold text-xs w-full">
+                    ✅ حفظ البطولة
+                  </button>
+                </div>
+              )}
+            </>
           )}
 
           <div className="space-y-1">
-            {selectedSwimmer?.competitions?.map((c) => (
+            {selectedSwimmer?.competitions
+              ?.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+              .map((c) => (
               <button
                 key={c.id}
                 onClick={() => { setSelectedCompId(c.id); setActiveTab(null); }}
@@ -269,7 +301,7 @@ export default function CompetitionsManager() {
                 <div className="font-semibold">{c.name}</div>
                 {c.date && <div className="text-xs opacity-80">{c.date}</div>}
                 <div className="text-xs mt-1">
-                  {c.plannedRaces.length} سباق
+                  {c.plannedRaces.length} سباق — {c.results.filter((r) => r.medal !== "none").length} ميدالية
                 </div>
               </button>
             ))}
@@ -289,7 +321,7 @@ export default function CompetitionsManager() {
               {selectedComp.date && <p className="text-xs text-gray-500 mb-4">📅 {selectedComp.date}</p>}
 
               <p className="text-sm text-gray-600 mb-4">
-                اختر ما تريد إدخاله :
+                {canEdit ? "اختر ما تريد إدخاله :" : "البيانات المتاحة :"}
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -299,8 +331,10 @@ export default function CompetitionsManager() {
                   className="card text-center hover:shadow-lg transition border-2 border-blue-200 bg-blue-50 p-6"
                 >
                   <div className="text-5xl mb-3">🏊</div>
-                  <h3 className="font-bold text-lg text-blue-700 mb-1">تسجيل السباقات</h3>
-                  <p className="text-xs text-gray-600">قبل البطولة</p>
+                  <h3 className="font-bold text-lg text-blue-700 mb-1">
+                    {canEdit ? "تسجيل السباقات" : "السباقات المخططة"}
+                  </h3>
+                  <p className="text-xs text-gray-600">{canEdit ? "قبل البطولة" : "كما أدخلها المدرب"}</p>
                   <p className="text-xs text-blue-600 mt-2 font-semibold">
                     {selectedComp.plannedRaces.length} سباق مسجّل
                   </p>
@@ -318,11 +352,16 @@ export default function CompetitionsManager() {
                 >
                   <div className="text-5xl mb-3">📊</div>
                   <h3 className={`font-bold text-lg mb-1 ${selectedComp.plannedRaces.length > 0 ? "text-green-700" : "text-gray-400"}`}>
-                    تسجيل النتائج
+                    {canEdit ? "تسجيل النتائج" : "النتائج المحققة"}
                   </h3>
-                  <p className="text-xs text-gray-600">بعد البطولة</p>
-                  {selectedComp.plannedRaces.length === 0 && (
+                  <p className="text-xs text-gray-600">{canEdit ? "بعد البطولة" : "كما أدخلها المدرب"}</p>
+                  {selectedComp.plannedRaces.length === 0 && canEdit && (
                     <p className="text-xs text-red-500 mt-2">⚠️ سجّل السباقات أولاً</p>
+                  )}
+                  {selectedComp.plannedRaces.length > 0 && (
+                    <p className="text-xs text-green-600 mt-2 font-semibold">
+                      {selectedComp.results.filter((r) => r.medal !== "none").length} ميدالية
+                    </p>
                   )}
                 </button>
               </div>
@@ -343,11 +382,15 @@ export default function CompetitionsManager() {
                 <button onClick={() => setActiveTab(null)} className="text-sm text-gray-500 hover:text-abha-green">
                   ← رجوع
                 </button>
-                <h2 className="text-lg font-bold text-abha-green">🏊 تسجيل السباقات</h2>
+                <h2 className="text-lg font-bold text-abha-green">
+                  🏊 {canEdit ? "تسجيل السباقات" : "السباقات المخططة"}
+                </h2>
               </div>
 
               <p className="text-xs text-gray-600 mb-3">
-                حدد السباقات التي سيشارك فيها السباح :
+                {canEdit
+                  ? "حدد السباقات التي سيشارك فيها السباح :"
+                  : "السباقات التي سجلها المدرب :"}
               </p>
 
               {canEdit ? (
@@ -369,11 +412,15 @@ export default function CompetitionsManager() {
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-1">
-                  {selectedComp.plannedRaces.map((r) => (
-                    <span key={r} className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">
-                      {r}
-                    </span>
-                  ))}
+                  {selectedComp.plannedRaces.length === 0 ? (
+                    <span className="text-xs text-gray-400">لم يتم تسجيل سباقات</span>
+                  ) : (
+                    selectedComp.plannedRaces.map((r) => (
+                      <span key={r} className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">
+                        {r}
+                      </span>
+                    ))
+                  )}
                 </div>
               )}
 
@@ -394,7 +441,9 @@ export default function CompetitionsManager() {
                 <button onClick={() => setActiveTab(null)} className="text-sm text-gray-500 hover:text-abha-green">
                   ← رجوع
                 </button>
-                <h2 className="text-lg font-bold text-abha-green">📊 تسجيل النتائج</h2>
+                <h2 className="text-lg font-bold text-abha-green">
+                  📊 {canEdit ? "تسجيل النتائج" : "النتائج المحققة"}
+                </h2>
               </div>
 
               <div className="space-y-3">
@@ -455,6 +504,12 @@ export default function CompetitionsManager() {
                           />
                         </div>
                       </div>
+                      {/* عرض الميدالية بجانب السباق */}
+                      {!canEdit && result?.medal !== "none" && result?.medal && (
+                        <p className="text-xs mt-1 text-abha-gold font-semibold">
+                          {getMedalEmoji(result.medal)} {result.position ? `المركز ${result.position}` : ""}
+                        </p>
+                      )}
                     </div>
                   );
                 })}
