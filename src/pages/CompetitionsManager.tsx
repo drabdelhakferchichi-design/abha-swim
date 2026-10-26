@@ -56,7 +56,6 @@ export default function CompetitionsManager() {
   const [newCompName, setNewCompName] = useState("");
   const [newCompDate, setNewCompDate] = useState("");
 
-  // نموذج إضافة نتيجة جديدة (في صفحة النتائج)
   const [newResultEvent, setNewResultEvent] = useState("");
   const [newResultPosition, setNewResultPosition] = useState(1);
   const [newResultMedal, setNewResultMedal] = useState<"gold" | "silver" | "bronze" | "none">("none");
@@ -152,7 +151,6 @@ export default function CompetitionsManager() {
     setSwimmers(swimmers.map((s) => (s.id === updated.id ? updated : s)));
   };
 
-  // إضافة نتيجة جديدة
   const addResult = () => {
     if (!selectedSwimmer || !selectedComp || !newResultEvent || !canEdit) return;
     const comps = [...(selectedSwimmer.competitions || [])];
@@ -174,7 +172,6 @@ export default function CompetitionsManager() {
       comps[idx].results.push(newRes);
     }
 
-    // إذا لم يكن السباق في المخطط، أضفه
     if (!comps[idx].plannedRaces.includes(newResultEvent)) {
       comps[idx].plannedRaces = [...comps[idx].plannedRaces, newResultEvent];
     }
@@ -343,7 +340,6 @@ export default function CompetitionsManager() {
               <p className="text-gray-500">اختر بطولة من القائمة لعرض تفاصيلها</p>
             </div>
           ) : activeTab === null ? (
-            // اختيار المرحلة
             <div className="card">
               <h2 className="text-lg font-bold text-abha-green mb-2">🏆 {selectedComp.name}</h2>
               {selectedComp.date && <p className="text-xs text-gray-500 mb-4">📅 {selectedComp.date}</p>}
@@ -353,7 +349,6 @@ export default function CompetitionsManager() {
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* بطاقة تسجيل السباقات */}
                 <button
                   onClick={() => setActiveTab("races")}
                   className="card text-center hover:shadow-lg transition border-2 border-blue-200 bg-blue-50 p-6"
@@ -368,7 +363,6 @@ export default function CompetitionsManager() {
                   </p>
                 </button>
 
-                {/* بطاقة تسجيل النتائج */}
                 <button
                   onClick={() => setActiveTab("results")}
                   className="card text-center hover:shadow-lg transition border-2 border-green-200 bg-green-50 p-6"
@@ -394,7 +388,6 @@ export default function CompetitionsManager() {
               )}
             </div>
           ) : activeTab === "races" ? (
-            // صفحة السباقات
             <div className="card">
               <div className="flex items-center justify-between mb-3">
                 <button onClick={() => setActiveTab(null)} className="text-sm text-gray-500 hover:text-abha-green">
@@ -453,7 +446,6 @@ export default function CompetitionsManager() {
               )}
             </div>
           ) : (
-            // صفحة النتائج
             <div className="card">
               <div className="flex items-center justify-between mb-3">
                 <button onClick={() => setActiveTab(null)} className="text-sm text-gray-500 hover:text-abha-green">
@@ -463,6 +455,50 @@ export default function CompetitionsManager() {
                   📊 {canEdit ? "تسجيل النتائج" : "النتائج المحققة"}
                 </h2>
               </div>
+
+              {/* ✅ ملخص النتائج */}
+              {selectedComp.results.length > 0 && (
+                <div className="bg-gradient-to-br from-abha-green/10 to-abha-gold/10 p-4 rounded-lg mb-4 border-2 border-abha-gold">
+                  <h3 className="text-sm font-bold text-abha-green mb-3">🏆 ملخص النتائج</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    <div className="text-center bg-white p-2 rounded-lg">
+                      <div className="text-2xl">🥇</div>
+                      <div className="text-xl font-bold text-abha-gold">
+                        {selectedComp.results.filter((r) => r.medal === "gold").length}
+                      </div>
+                      <div className="text-xs text-gray-500">ذهبية</div>
+                    </div>
+                    <div className="text-center bg-white p-2 rounded-lg">
+                      <div className="text-2xl">🥈</div>
+                      <div className="text-xl font-bold text-gray-500">
+                        {selectedComp.results.filter((r) => r.medal === "silver").length}
+                      </div>
+                      <div className="text-xs text-gray-500">فضية</div>
+                    </div>
+                    <div className="text-center bg-white p-2 rounded-lg">
+                      <div className="text-2xl">🥉</div>
+                      <div className="text-xl font-bold text-orange-600">
+                        {selectedComp.results.filter((r) => r.medal === "bronze").length}
+                      </div>
+                      <div className="text-xs text-gray-500">برونزية</div>
+                    </div>
+                    <div className="text-center bg-white p-2 rounded-lg">
+                      <div className="text-2xl">🏅</div>
+                      <div className="text-xl font-bold text-abha-green">
+                        {selectedComp.results.filter((r) => r.medal !== "none").length}
+                      </div>
+                      <div className="text-xs text-gray-500">مجموع الميداليات</div>
+                    </div>
+                    <div className="text-center bg-white p-2 rounded-lg">
+                      <div className="text-2xl">⭐</div>
+                      <div className="text-xl font-bold text-blue-600">
+                        {selectedComp.results.reduce((sum, r) => sum + (r.points || 0), 0)}
+                      </div>
+                      <div className="text-xs text-gray-500">مجموع النقاط</div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* نموذج إضافة نتيجة جديدة (للمدرب فقط) */}
               {canEdit && (
