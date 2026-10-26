@@ -27,6 +27,7 @@ const menuItems: MenuItem[] = [
   { to: "/trainings",     label: "جدول التمارين",     icon: "📅", roles: ["admin", "coach", "swimmer", "parent"] },
   { to: "/times",         label: "الأرقام والأزمنة",  icon: "⏱️", roles: ["admin", "coach", "swimmer", "parent"] },
   { to: "/competitions",  label: "البطولات",          icon: "🏆", roles: ["admin", "coach", "swimmer", "parent"] },
+    { to: "/competitions-manager", label: "إدارة البطولات", icon: "🎯", roles: ["admin", "coach", "parent"] },
   { to: "/settings",      label: "الإعدادات",         icon: "⚙️", roles: ["admin", "coach", "swimmer", "parent"] },
   { to: "/guide",         label: "دليل الاستخدام",    icon: "📖", roles: ["admin", "coach", "parent"] },
   { to: "/meetings",      label: "اجتماعات Zoom", icon: "📹", roles: ["admin", "coach", "parent", "swimmer"] },

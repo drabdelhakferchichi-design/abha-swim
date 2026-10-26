@@ -17,16 +17,11 @@ import Meetings from "./pages/Meetings";
 import Search from "./pages/Search";
 import Settings from "./pages/Settings";
 import Guide from "./pages/Guide";
+import CompetitionsManager from "./pages/CompetitionsManager"; // ✅ تمت الإضافة
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-abha-bg">
-        <div className="text-abha-green text-lg font-semibold">جاري التحميل...</div>
-      </div>
-    );
-  }
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-abha-bg"><div className="text-abha-green text-lg font-semibold">جاري التحميل...</div></div>;
   if (!user) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
@@ -44,15 +39,16 @@ function AppRoutes() {
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
-      <Route path="/parents" element={<ProtectedRoute><Parents /></ProtectedRoute>} />
-     <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} /> 
-     <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
       <Route path="/swimmers" element={<ProtectedRoute><Swimmers /></ProtectedRoute>} />
+      <Route path="/swimmers/:id" element={<ProtectedRoute><SwimmerDetails /></ProtectedRoute>} />
+      <Route path="/parents" element={<ProtectedRoute><Parents /></ProtectedRoute>} />
+      <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+      <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
       <Route path="/news" element={<ProtectedRoute><News /></ProtectedRoute>} />
       <Route path="/trainings" element={<ProtectedRoute><Trainings /></ProtectedRoute>} />
       <Route path="/times" element={<ProtectedRoute><Times /></ProtectedRoute>} />
       <Route path="/competitions" element={<ProtectedRoute><Competitions /></ProtectedRoute>} />
-      <Route path="/swimmers/:id" element={<ProtectedRoute><SwimmerDetails /></ProtectedRoute>} />
+      <Route path="/competitions-manager" element={<ProtectedRoute><CompetitionsManager /></ProtectedRoute>} /> {/* ✅ تمت الإضافة */}
       <Route path="/qualifying" element={<ProtectedRoute><Qualifying /></ProtectedRoute>} />
       <Route path="/meetings" element={<ProtectedRoute><Meetings /></ProtectedRoute>} />
       <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
