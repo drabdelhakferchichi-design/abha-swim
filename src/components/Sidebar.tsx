@@ -28,6 +28,7 @@ const menuItems: MenuItem[] = [
   { to: "/times",         label: "الأرقام والأزمنة",  icon: "⏱️", roles: ["admin", "coach", "swimmer", "parent"] },
   { to: "/competitions",  label: "البطولات",          icon: "🏆", roles: ["admin", "coach", "swimmer", "parent"] },
     { to: "/competitions-manager", label: "إدارة البطولات", icon: "🎯", roles: ["admin", "coach", "parent"] },
+    { to: "/competition-results", label: "النتائج العامة", icon: "📊", roles: ["admin"] },
   { to: "/settings",      label: "الإعدادات",         icon: "⚙️", roles: ["admin", "coach", "swimmer", "parent"] },
   { to: "/guide",         label: "دليل الاستخدام",    icon: "📖", roles: ["admin", "coach", "parent"] },
   { to: "/meetings",      label: "اجتماعات Zoom", icon: "📹", roles: ["admin", "coach", "parent", "swimmer"] },

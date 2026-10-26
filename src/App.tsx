@@ -17,11 +17,18 @@ import Meetings from "./pages/Meetings";
 import Search from "./pages/Search";
 import Settings from "./pages/Settings";
 import Guide from "./pages/Guide";
-import CompetitionsManager from "./pages/CompetitionsManager"; // ✅ تمت الإضافة
+import CompetitionsManager from "./pages/CompetitionsManager";
+import CompetitionResults from "./pages/CompetitionResults";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-abha-bg"><div className="text-abha-green text-lg font-semibold">جاري التحميل...</div></div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-abha-bg">
+        <div className="text-abha-green text-lg font-semibold">جاري التحميل...</div>
+      </div>
+    );
+  }
   if (!user) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
@@ -48,7 +55,8 @@ function AppRoutes() {
       <Route path="/trainings" element={<ProtectedRoute><Trainings /></ProtectedRoute>} />
       <Route path="/times" element={<ProtectedRoute><Times /></ProtectedRoute>} />
       <Route path="/competitions" element={<ProtectedRoute><Competitions /></ProtectedRoute>} />
-      <Route path="/competitions-manager" element={<ProtectedRoute><CompetitionsManager /></ProtectedRoute>} /> {/* ✅ تمت الإضافة */}
+      <Route path="/competitions-manager" element={<ProtectedRoute><CompetitionsManager /></ProtectedRoute>} />
+      <Route path="/competition-results" element={<ProtectedRoute><CompetitionResults /></ProtectedRoute>} />
       <Route path="/qualifying" element={<ProtectedRoute><Qualifying /></ProtectedRoute>} />
       <Route path="/meetings" element={<ProtectedRoute><Meetings /></ProtectedRoute>} />
       <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
