@@ -172,7 +172,7 @@ export default function Parents() {
 
     try {
       // محاولة الحذف عبر API (Auth + Firestore)
-      const response = await fetch("/api/delete-user", {
+      const response = await fetch("/api/delete-user-v2", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ uid: parent.uid }),
