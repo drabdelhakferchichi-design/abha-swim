@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   collection,
   doc,
@@ -6,6 +6,7 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
 import Layout from "../components/Layout";
@@ -62,6 +63,8 @@ export default function CompetitionsManager() {
   const [newResultMedal, setNewResultMedal] = useState<"gold" | "silver" | "bronze" | "none">("none");
   const [newResultPoints, setNewResultPoints] = useState(0);
   const [newResultTime, setNewResultTime] = useState("");
+
+  const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -218,58 +221,24 @@ export default function CompetitionsManager() {
     return "—";
   };
 
-  const exportCompetitionPDF = (swimmer: Swimmer, comp: Competition) => {
-    const pdf = new jsPDF("p", "mm", "a4");
-    const pageWidth = pdf.internal.pageSize.getWidth();
-
-    pdf.setFontSize(20);
-    pdf.text("Abha Swim Club", pageWidth / 2, 20, { align: "center" });
-    pdf.setFontSize(14);
-    pdf.text("Competition Results", pageWidth / 2, 30, { align: "center" });
-
-    pdf.setFontSize(12);
-    pdf.text(`Swimmer: ${swimmer.name}`, 15, 45);
-    pdf.text(`Age: ${swimmer.ageCategory}`, 15, 52);
-    pdf.text(`Competition: ${comp.name}`, 15, 59);
-    if (comp.date) pdf.text(`Date: ${comp.date}`, 15, 66);
-
-    const gold = comp.results.filter((r) => r.medal === "gold").length;
-    const silver = comp.results.filter((r) => r.medal === "silver").length;
-    const bronze = comp.results.filter((r) => r.medal === "bronze").length;
-    const totalMedals = gold + silver + bronze;
-    const totalPoints = comp.results.reduce((s, r) => s + (r.points || 0), 0);
-
-    pdf.setFontSize(14);
-    pdf.text("Summary", 15, 80);
-    pdf.setFontSize(11);
-    pdf.text(`Gold: ${gold}  |  Silver: ${silver}  |  Bronze: ${bronze}`, 15, 88);
-    pdf.text(`Total Medals: ${totalMedals}  |  Total Points: ${totalPoints}`, 15, 95);
-
-    pdf.setFontSize(14);
-    pdf.text("Race Results", 15, 110);
-    pdf.setFontSize(10);
-    let y = 120;
-    pdf.text("Event", 15, y);
-    pdf.text("Position", 75, y);
-    pdf.text("Medal", 110, y);
-    pdf.text("Points", 140, y);
-    pdf.text("Time", 165, y);
-    y += 6;
-
-    comp.results.forEach((r) => {
-      if (y > 270) {
-        pdf.addPage();
-        y = 20;
-      }
-      pdf.text(r.event, 15, y);
-      pdf.text(String(r.position || "-"), 75, y);
-      pdf.text(r.medal === "none" ? "-" : r.medal, 110, y);
-      pdf.text(String(r.points || 0), 140, y);
-      pdf.text(r.time || "-", 165, y);
-      y += 6;
-    });
-
-    pdf.save(`نتائج-${swimmer.name}-${comp.name}.pdf`);
+  const exportCompetitionPDF = async (swimmer: Swimmer, comp: Competition) => {
+    if (!reportRef.current) return;
+    try {
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+      });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`نتائج-${swimmer.name}-${comp.name}.pdf`);
+    } catch (err) {
+      console.error(err);
+      alert("خطأ في تصدير PDF");
+    }
   };
 
   if (loading) {
@@ -286,9 +255,7 @@ export default function CompetitionsManager() {
     <Layout>
       <h1 className="text-2xl font-bold text-abha-green mb-6">🏆 إدارة البطولات</h1>
       {isReadOnly && (
-        <p className="text-xs text-gray-500 mb-4">
-          👁️ عرض فقط (كما أدخله المدرب)
-        </p>
+        <p className="text-xs text-gray-500 mb-4">👁️ عرض فقط (كما أدخله المدرب)</p>
       )}
 
       {msg.text && (
@@ -354,9 +321,7 @@ export default function CompetitionsManager() {
                     className="input text-xs mb-1"
                     dir="ltr"
                   />
-                  <p className="text-xs text-gray-500 mb-1">
-                    💡 يمكنك اختيار تاريخ قديم للبطولات السابقة
-                  </p>
+                  <p className="text-xs text-gray-500 mb-1">💡 يمكنك اختيار تاريخ قديم</p>
                   <button onClick={addCompetition} className="btn-gold text-xs w-full">
                     ✅ حفظ البطولة
                   </button>
@@ -454,9 +419,7 @@ export default function CompetitionsManager() {
               </div>
 
               <p className="text-xs text-gray-600 mb-3">
-                {canEdit
-                  ? "حدد السباقات التي سيشارك فيها السباح :"
-                  : "السباقات التي سجلها المدرب :"}
+                {canEdit ? "حدد السباقات التي سيشارك فيها السباح :" : "السباقات التي سجلها المدرب :"}
               </p>
 
               {canEdit ? (
@@ -531,53 +494,133 @@ export default function CompetitionsManager() {
                 })}
               </p>
 
-              {/* ملخص النتائج */}
-              {selectedComp.results.length > 0 && (
-                <div className="bg-gradient-to-br from-abha-green/10 to-abha-gold/10 p-4 rounded-lg mb-4 border-2 border-abha-gold">
-                  <h3 className="text-sm font-bold text-abha-green mb-3">🏆 ملخص النتائج</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                    <div className="text-center bg-white p-2 rounded-lg">
-                      <div className="text-2xl">🥇</div>
-                      <div className="text-xl font-bold text-abha-gold">
-                        {selectedComp.results.filter((r) => r.medal === "gold").length}
+              {/* ═══════════ بداية محتوى PDF ═══════════ */}
+              <div ref={reportRef} style={{ padding: "20px", backgroundColor: "#ffffff", direction: "rtl" }}>
+                
+                {/* الشعار والعنوان */}
+                <div style={{ textAlign: "center", marginBottom: "20px", paddingBottom: "15px", borderBottom: "3px solid #1B5E20" }}>
+                  <img
+                    src="/images/logo.png"
+                    alt="نادي أبها"
+                    style={{ width: "80px", height: "80px", margin: "0 auto", display: "block" }}
+                  />
+                  <h1 style={{ fontSize: "22px", fontWeight: "bold", color: "#1B5E20", margin: "10px 0 5px 0" }}>
+                    نادي أبها للسباحة
+                  </h1>
+                  <h2 style={{ fontSize: "16px", color: "#C9A227", margin: 0 }}>
+                    تقرير نتائج البطولة
+                  </h2>
+                </div>
+
+                {/* معلومات السباح */}
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "10px",
+                  marginBottom: "20px",
+                  fontSize: "14px",
+                  background: "#F5F7FA",
+                  padding: "12px",
+                  borderRadius: "8px",
+                }}>
+                  <div><strong>السباح:</strong> {selectedSwimmer?.name}</div>
+                  <div><strong>الفئة:</strong> {selectedSwimmer?.ageCategory}</div>
+                  <div><strong>البطولة:</strong> {selectedComp?.name}</div>
+                  <div><strong>التاريخ:</strong> {selectedComp?.date || "—"}</div>
+                </div>
+
+                {/* ملخص النتائج */}
+                {selectedComp.results.length > 0 && (
+                  <div style={{
+                    background: "linear-gradient(135deg, #E8F5E9 0%, #FFF8E1 100%)",
+                    padding: "15px",
+                    borderRadius: "8px",
+                    marginBottom: "20px",
+                    border: "2px solid #C9A227",
+                  }}>
+                    <h3 style={{ fontSize: "16px", fontWeight: "bold", color: "#1B5E20", marginBottom: "12px" }}>
+                      🏆 ملخص النتائج
+                    </h3>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "8px" }}>
+                      <div style={{ textAlign: "center", background: "white", padding: "8px", borderRadius: "6px" }}>
+                        <div style={{ fontSize: "24px" }}>🥇</div>
+                        <div style={{ fontSize: "20px", fontWeight: "bold", color: "#C9A227" }}>
+                          {selectedComp.results.filter((r) => r.medal === "gold").length}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "#666" }}>ذهبية</div>
                       </div>
-                      <div className="text-xs text-gray-500">ذهبية</div>
-                    </div>
-                    <div className="text-center bg-white p-2 rounded-lg">
-                      <div className="text-2xl">🥈</div>
-                      <div className="text-xl font-bold text-gray-500">
-                        {selectedComp.results.filter((r) => r.medal === "silver").length}
+                      <div style={{ textAlign: "center", background: "white", padding: "8px", borderRadius: "6px" }}>
+                        <div style={{ fontSize: "24px" }}>🥈</div>
+                        <div style={{ fontSize: "20px", fontWeight: "bold", color: "#666" }}>
+                          {selectedComp.results.filter((r) => r.medal === "silver").length}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "#666" }}>فضية</div>
                       </div>
-                      <div className="text-xs text-gray-500">فضية</div>
-                    </div>
-                    <div className="text-center bg-white p-2 rounded-lg">
-                      <div className="text-2xl">🥉</div>
-                      <div className="text-xl font-bold text-orange-600">
-                        {selectedComp.results.filter((r) => r.medal === "bronze").length}
+                      <div style={{ textAlign: "center", background: "white", padding: "8px", borderRadius: "6px" }}>
+                        <div style={{ fontSize: "24px" }}>🥉</div>
+                        <div style={{ fontSize: "20px", fontWeight: "bold", color: "#E65100" }}>
+                          {selectedComp.results.filter((r) => r.medal === "bronze").length}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "#666" }}>برونزية</div>
                       </div>
-                      <div className="text-xs text-gray-500">برونزية</div>
-                    </div>
-                    <div className="text-center bg-white p-2 rounded-lg">
-                      <div className="text-2xl">🏅</div>
-                      <div className="text-xl font-bold text-abha-green">
-                        {selectedComp.results.filter((r) => r.medal !== "none").length}
+                      <div style={{ textAlign: "center", background: "white", padding: "8px", borderRadius: "6px" }}>
+                        <div style={{ fontSize: "24px" }}>🏅</div>
+                        <div style={{ fontSize: "20px", fontWeight: "bold", color: "#1B5E20" }}>
+                          {selectedComp.results.filter((r) => r.medal !== "none").length}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "#666" }}>المجموع</div>
                       </div>
-                      <div className="text-xs text-gray-500">مجموع الميداليات</div>
-                    </div>
-                    <div className="text-center bg-white p-2 rounded-lg">
-                      <div className="text-2xl">⭐</div>
-                      <div className="text-xl font-bold text-blue-600">
-                        {selectedComp.results.reduce((sum, r) => sum + (r.points || 0), 0)}
+                      <div style={{ textAlign: "center", background: "white", padding: "8px", borderRadius: "6px" }}>
+                        <div style={{ fontSize: "24px" }}>⭐</div>
+                        <div style={{ fontSize: "20px", fontWeight: "bold", color: "#0288D1" }}>
+                          {selectedComp.results.reduce((sum, r) => sum + (r.points || 0), 0)}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "#666" }}>النقاط</div>
                       </div>
-                      <div className="text-xs text-gray-500">مجموع النقاط</div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* نموذج إضافة نتيجة جديدة */}
+                {/* النتائج */}
+                <h3 style={{ fontSize: "16px", fontWeight: "bold", color: "#1B5E20", marginBottom: "10px" }}>
+                  📋 نتائج السباقات
+                </h3>
+
+                {selectedComp.results.length === 0 ? (
+                  <p style={{ textAlign: "center", color: "#999", padding: "20px" }}>لا توجد نتائج مسجّلة</p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {selectedComp.results.map((r) => (
+                      <div key={r.event} style={{
+                        background: "#F5F7FA",
+                        padding: "12px",
+                        borderRadius: "8px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                      }}>
+                        <div style={{ fontSize: "28px" }}>{getMedalEmoji(r.medal)}</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: "bold", fontSize: "15px", color: "#1B5E20" }}>{r.event}</div>
+                          <div style={{ fontSize: "12px", color: "#666", marginTop: "4px" }}>
+                            المركز: <strong>{r.position || "—"}</strong> · النقاط: <strong style={{ color: "#C9A227" }}>{r.points}</strong> · الزمن: <strong style={{ direction: "ltr", display: "inline-block" }}>{r.time || "—"}</strong>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Footer */}
+                <div style={{ marginTop: "30px", paddingTop: "15px", borderTop: "2px solid #1B5E20", textAlign: "center", fontSize: "11px", color: "#999" }}>
+                  نادي أبها للسباحة — تم الإنشاء في {new Date().toLocaleString("ar-SA")}
+                </div>
+              </div>
+              {/* ═══════════ نهاية محتوى PDF ═══════════ */}
+
+              {/* نموذج إضافة نتيجة */}
               {canEdit && (
-                <div className="bg-abha-bg p-3 rounded-lg mb-4">
+                <div className="bg-abha-bg p-3 rounded-lg mb-4 mt-4">
                   <h3 className="text-sm font-bold text-abha-green mb-2">➕ إضافة نتيجة جديدة</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                     <div className="sm:col-span-2">
@@ -648,48 +691,17 @@ export default function CompetitionsManager() {
                 </div>
               )}
 
-              {/* قائمة النتائج */}
-              {selectedComp.results.length === 0 ? (
-                <div className="text-center py-6">
-                  <p className="text-gray-500">لا توجد نتائج مسجّلة بعد</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
+              {/* حذف النتائج */}
+              {canEdit && selectedComp.results.length > 0 && (
+                <div className="mt-2 space-y-1">
                   {selectedComp.results.map((r) => (
-                    <div key={r.event} className="bg-abha-bg p-3 rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-2xl">{getMedalEmoji(r.medal)}</span>
-                          <span className="font-bold">{r.event}</span>
-                        </div>
-                        {canEdit && (
-                          <button
-                            onClick={() => deleteResult(r.event)}
-                            className="text-red-500 hover:text-red-700 text-xs"
-                          >
-                            🗑️
-                          </button>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
-                        <div className="bg-white p-2 rounded text-center">
-                          <div className="text-xs text-gray-500">المركز</div>
-                          <div className="font-bold">{r.position || "—"}</div>
-                        </div>
-                        <div className="bg-white p-2 rounded text-center">
-                          <div className="text-xs text-gray-500">الميدالية</div>
-                          <div className="font-bold">{r.medal === "none" ? "بدون" : getMedalEmoji(r.medal)}</div>
-                        </div>
-                        <div className="bg-white p-2 rounded text-center">
-                          <div className="text-xs text-gray-500">النقاط</div>
-                          <div className="font-bold text-abha-gold">{r.points}</div>
-                        </div>
-                        <div className="bg-white p-2 rounded text-center">
-                          <div className="text-xs text-gray-500">الزمن</div>
-                          <div className="font-mono font-bold" dir="ltr">{r.time || "—"}</div>
-                        </div>
-                      </div>
-                    </div>
+                    <button
+                      key={r.event}
+                      onClick={() => deleteResult(r.event)}
+                      className="text-red-500 hover:text-red-700 text-xs w-full text-right"
+                    >
+                      🗑️ حذف {r.event}
+                    </button>
                   ))}
                 </div>
               )}
