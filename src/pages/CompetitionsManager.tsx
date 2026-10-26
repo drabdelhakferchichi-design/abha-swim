@@ -56,7 +56,13 @@ export default function CompetitionsManager() {
   const [newCompName, setNewCompName] = useState("");
   const [newCompDate, setNewCompDate] = useState("");
 
-  // تحميل السباحين
+  // نموذج إضافة نتيجة جديدة (في صفحة النتائج)
+  const [newResultEvent, setNewResultEvent] = useState("");
+  const [newResultPosition, setNewResultPosition] = useState(1);
+  const [newResultMedal, setNewResultMedal] = useState<"gold" | "silver" | "bronze" | "none">("none");
+  const [newResultPoints, setNewResultPoints] = useState(0);
+  const [newResultTime, setNewResultTime] = useState("");
+
   useEffect(() => {
     if (!user) return;
     const unsub = onSnapshot(collection(db, "swimmers"), (snap) => {
@@ -92,7 +98,6 @@ export default function CompetitionsManager() {
   const selectedSwimmer = swimmers.find((s) => s.id === selectedSwimmerId) || null;
   const selectedComp = selectedSwimmer?.competitions?.find((c) => c.id === selectedCompId) || null;
 
-  // حفظ السباح
   const saveSwimmer = async (swimmer: Swimmer) => {
     setSaving(true);
     setMsg({ type: "", text: "" });
@@ -109,7 +114,6 @@ export default function CompetitionsManager() {
     setSaving(false);
   };
 
-  // إضافة بطولة جديدة (قادمة أو سابقة)
   const addCompetition = () => {
     if (!selectedSwimmer || !newCompName.trim()) return;
     const newComp: Competition = {
@@ -132,7 +136,6 @@ export default function CompetitionsManager() {
     saveSwimmer(updated);
   };
 
-  // toggle السباق
   const toggleRace = (race: string) => {
     if (!selectedSwimmer || !selectedComp || !canEdit) return;
     const comps = [...(selectedSwimmer.competitions || [])];
@@ -142,7 +145,6 @@ export default function CompetitionsManager() {
     const planned = [...comps[idx].plannedRaces];
     if (planned.includes(race)) {
       comps[idx].plannedRaces = planned.filter((r) => r !== race);
-      comps[idx].results = comps[idx].results.filter((r) => r.event !== race);
     } else {
       comps[idx].plannedRaces = [...planned, race];
     }
@@ -150,30 +152,56 @@ export default function CompetitionsManager() {
     setSwimmers(swimmers.map((s) => (s.id === updated.id ? updated : s)));
   };
 
-  // تحديث نتيجة
-  const updateResult = (race: string, field: keyof SwimResult, value: string | number) => {
-    if (!selectedSwimmer || !selectedComp || !canEdit) return;
+  // إضافة نتيجة جديدة
+  const addResult = () => {
+    if (!selectedSwimmer || !selectedComp || !newResultEvent || !canEdit) return;
     const comps = [...(selectedSwimmer.competitions || [])];
     const idx = comps.findIndex((c) => c.id === selectedComp.id);
     if (idx < 0) return;
 
-    const resultIdx = comps[idx].results.findIndex((r) => r.event === race);
-    if (resultIdx >= 0) {
-      comps[idx].results[resultIdx] = { ...comps[idx].results[resultIdx], [field]: value };
+    const newRes: SwimResult = {
+      event: newResultEvent,
+      position: newResultPosition,
+      medal: newResultMedal,
+      points: newResultPoints,
+      time: newResultTime,
+    };
+
+    const existingIdx = comps[idx].results.findIndex((r) => r.event === newResultEvent);
+    if (existingIdx >= 0) {
+      comps[idx].results[existingIdx] = newRes;
     } else {
-      comps[idx].results.push({
-        event: race,
-        position: field === "position" ? Number(value) : 0,
-        medal: field === "medal" ? (value as "gold" | "silver" | "bronze" | "none") : "none",
-        points: field === "points" ? Number(value) : 0,
-        time: field === "time" ? String(value) : "",
-      });
+      comps[idx].results.push(newRes);
     }
+
+    // إذا لم يكن السباق في المخطط، أضفه
+    if (!comps[idx].plannedRaces.includes(newResultEvent)) {
+      comps[idx].plannedRaces = [...comps[idx].plannedRaces, newResultEvent];
+    }
+
     const updated: Swimmer = { ...selectedSwimmer, competitions: comps };
     setSwimmers(swimmers.map((s) => (s.id === updated.id ? updated : s)));
+    setNewResultEvent("");
+    setNewResultPosition(1);
+    setNewResultMedal("none");
+    setNewResultPoints(0);
+    setNewResultTime("");
+    saveSwimmer(updated);
   };
 
-  // حذف بطولة
+  const deleteResult = (event: string) => {
+    if (!selectedSwimmer || !selectedComp || !canEdit) return;
+    if (!confirm("حذف هذه النتيجة ؟")) return;
+    const comps = [...(selectedSwimmer.competitions || [])];
+    const idx = comps.findIndex((c) => c.id === selectedComp.id);
+    if (idx < 0) return;
+
+    comps[idx].results = comps[idx].results.filter((r) => r.event !== event);
+    const updated: Swimmer = { ...selectedSwimmer, competitions: comps };
+    setSwimmers(swimmers.map((s) => (s.id === updated.id ? updated : s)));
+    saveSwimmer(updated);
+  };
+
   const deleteCompetition = () => {
     if (!selectedSwimmer || !selectedComp || !canEdit) return;
     if (!confirm("حذف البطولة ؟")) return;
@@ -207,7 +235,7 @@ export default function CompetitionsManager() {
       <h1 className="text-2xl font-bold text-abha-green mb-6">🏆 إدارة البطولات</h1>
       {isReadOnly && (
         <p className="text-xs text-gray-500 mb-4">
-          👁️ عرض فقط (كما أدخله المدرب) — للقراءة فقط
+          👁️ عرض فقط (كما أدخله المدرب)
         </p>
       )}
 
@@ -222,7 +250,7 @@ export default function CompetitionsManager() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {/* العمود 1: قائمة السباحين */}
+        {/* قائمة السباحين */}
         <div className="card lg:col-span-1">
           <h2 className="font-bold text-abha-green mb-3">👥 السباحون</h2>
           <div className="space-y-1">
@@ -245,7 +273,7 @@ export default function CompetitionsManager() {
           </div>
         </div>
 
-        {/* العمود 2: بطولات السباح */}
+        {/* بطولات السباح */}
         <div className="card lg:col-span-1">
           <h2 className="font-bold text-abha-green mb-3">🏆 بطولات {selectedSwimmer?.name || ""}</h2>
 
@@ -308,7 +336,7 @@ export default function CompetitionsManager() {
           </div>
         </div>
 
-        {/* العمود 3-4: المحتوى */}
+        {/* المحتوى */}
         <div className="lg:col-span-2">
           {!selectedComp ? (
             <div className="card text-center py-12">
@@ -343,26 +371,16 @@ export default function CompetitionsManager() {
                 {/* بطاقة تسجيل النتائج */}
                 <button
                   onClick={() => setActiveTab("results")}
-                  disabled={selectedComp.plannedRaces.length === 0}
-                  className={`card text-center hover:shadow-lg transition border-2 p-6 ${
-                    selectedComp.plannedRaces.length > 0
-                      ? "border-green-200 bg-green-50"
-                      : "border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed"
-                  }`}
+                  className="card text-center hover:shadow-lg transition border-2 border-green-200 bg-green-50 p-6"
                 >
                   <div className="text-5xl mb-3">📊</div>
-                  <h3 className={`font-bold text-lg mb-1 ${selectedComp.plannedRaces.length > 0 ? "text-green-700" : "text-gray-400"}`}>
+                  <h3 className="font-bold text-lg text-green-700 mb-1">
                     {canEdit ? "تسجيل النتائج" : "النتائج المحققة"}
                   </h3>
-                  <p className="text-xs text-gray-600">{canEdit ? "بعد البطولة" : "كما أدخلها المدرب"}</p>
-                  {selectedComp.plannedRaces.length === 0 && canEdit && (
-                    <p className="text-xs text-red-500 mt-2">⚠️ سجّل السباقات أولاً</p>
-                  )}
-                  {selectedComp.plannedRaces.length > 0 && (
-                    <p className="text-xs text-green-600 mt-2 font-semibold">
-                      {selectedComp.results.filter((r) => r.medal !== "none").length} ميدالية
-                    </p>
-                  )}
+                  <p className="text-xs text-gray-600">{canEdit ? "بعد البطولة" : "كما أدخله المدرب"}</p>
+                  <p className="text-xs text-green-600 mt-2 font-semibold">
+                    {selectedComp.results.filter((r) => r.medal !== "none").length} ميدالية
+                  </p>
                 </button>
               </div>
 
@@ -446,83 +464,123 @@ export default function CompetitionsManager() {
                 </h2>
               </div>
 
-              <div className="space-y-3">
-                {selectedComp.plannedRaces.map((race) => {
-                  const result = selectedComp.results.find((r) => r.event === race);
-                  return (
-                    <div key={race} className="bg-abha-bg p-3 rounded-lg">
-                      <p className="text-sm font-bold mb-2">🏅 {race}</p>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-0.5">المركز</label>
-                          <input
-                            type="number"
-                            value={result?.position || ""}
-                            onChange={(e) => updateResult(race, "position", Number(e.target.value))}
-                            className="input text-sm"
-                            disabled={!canEdit}
-                            min={1}
-                            placeholder="1"
-                          />
+              {/* نموذج إضافة نتيجة جديدة (للمدرب فقط) */}
+              {canEdit && (
+                <div className="bg-abha-bg p-3 rounded-lg mb-4">
+                  <h3 className="text-sm font-bold text-abha-green mb-2">➕ إضافة نتيجة جديدة</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs text-gray-500 mb-0.5">السباق</label>
+                      <select
+                        value={newResultEvent}
+                        onChange={(e) => setNewResultEvent(e.target.value)}
+                        className="input text-sm"
+                      >
+                        <option value="">— اختر السباق —</option>
+                        {allRaces.map((r) => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">المركز</label>
+                      <input
+                        type="number"
+                        value={newResultPosition}
+                        onChange={(e) => setNewResultPosition(Number(e.target.value))}
+                        className="input text-sm"
+                        min={1}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">الميدالية</label>
+                      <select
+                        value={newResultMedal}
+                        onChange={(e) => setNewResultMedal(e.target.value as "gold" | "silver" | "bronze" | "none")}
+                        className="input text-sm"
+                      >
+                        <option value="none">بدون</option>
+                        <option value="gold">🥇 ذهبية</option>
+                        <option value="silver">🥈 فضية</option>
+                        <option value="bronze">🥉 برونزية</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">النقاط</label>
+                      <input
+                        type="number"
+                        value={newResultPoints}
+                        onChange={(e) => setNewResultPoints(Number(e.target.value))}
+                        className="input text-sm"
+                        min={0}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">الزمن</label>
+                      <input
+                        type="text"
+                        value={newResultTime}
+                        onChange={(e) => setNewResultTime(e.target.value)}
+                        className="input text-sm"
+                        dir="ltr"
+                        placeholder="32.45"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={addResult}
+                    disabled={!newResultEvent}
+                    className="btn-primary text-sm disabled:opacity-50"
+                  >
+                    ➕ إضافة النتيجة
+                  </button>
+                </div>
+              )}
+
+              {/* قائمة النتائج */}
+              {selectedComp.results.length === 0 ? (
+                <div className="text-center py-6">
+                  <p className="text-gray-500">لا توجد نتائج مسجّلة بعد</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {selectedComp.results.map((r) => (
+                    <div key={r.event} className="bg-abha-bg p-3 rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl">{getMedalEmoji(r.medal)}</span>
+                          <span className="font-bold">{r.event}</span>
                         </div>
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-0.5">الميدالية</label>
-                          <select
-                            value={result?.medal || "none"}
-                            onChange={(e) => updateResult(race, "medal", e.target.value)}
-                            className="input text-sm"
-                            disabled={!canEdit}
+                        {canEdit && (
+                          <button
+                            onClick={() => deleteResult(r.event)}
+                            className="text-red-500 hover:text-red-700 text-xs"
                           >
-                            <option value="none">بدون</option>
-                            <option value="gold">🥇 ذهبية</option>
-                            <option value="silver">🥈 فضية</option>
-                            <option value="bronze">🥉 برونزية</option>
-                          </select>
+                            🗑️
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+                        <div className="bg-white p-2 rounded text-center">
+                          <div className="text-xs text-gray-500">المركز</div>
+                          <div className="font-bold">{r.position || "—"}</div>
                         </div>
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-0.5">النقاط</label>
-                          <input
-                            type="number"
-                            value={result?.points || ""}
-                            onChange={(e) => updateResult(race, "points", Number(e.target.value))}
-                            className="input text-sm"
-                            disabled={!canEdit}
-                            min={0}
-                            placeholder="0"
-                          />
+                        <div className="bg-white p-2 rounded text-center">
+                          <div className="text-xs text-gray-500">الميدالية</div>
+                          <div className="font-bold">{r.medal === "none" ? "بدون" : getMedalEmoji(r.medal)}</div>
                         </div>
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-0.5">الزمن</label>
-                          <input
-                            type="text"
-                            value={result?.time || ""}
-                            onChange={(e) => updateResult(race, "time", e.target.value)}
-                            className="input text-sm"
-                            dir="ltr"
-                            disabled={!canEdit}
-                            placeholder="32.45"
-                          />
+                        <div className="bg-white p-2 rounded text-center">
+                          <div className="text-xs text-gray-500">النقاط</div>
+                          <div className="font-bold text-abha-gold">{r.points}</div>
+                        </div>
+                        <div className="bg-white p-2 rounded text-center">
+                          <div className="text-xs text-gray-500">الزمن</div>
+                          <div className="font-mono font-bold" dir="ltr">{r.time || "—"}</div>
                         </div>
                       </div>
-                      {/* عرض الميدالية بجانب السباق */}
-                      {!canEdit && result?.medal !== "none" && result?.medal && (
-                        <p className="text-xs mt-1 text-abha-gold font-semibold">
-                          {getMedalEmoji(result.medal)} {result.position ? `المركز ${result.position}` : ""}
-                        </p>
-                      )}
                     </div>
-                  );
-                })}
-              </div>
-
-              {canEdit && (
-                <button
-                  onClick={() => saveSwimmer(selectedSwimmer!)}
-                  disabled={saving}
-                  className="btn-primary mt-4 text-sm w-full disabled:opacity-50"
-                >
-                  {saving ? "جاري الحفظ..." : "💾 حفظ النتائج"}
-                </button>
+                  ))}
+                </div>
               )}
             </div>
           )}
