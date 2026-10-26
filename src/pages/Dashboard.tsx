@@ -25,6 +25,13 @@ const greetings: Record<string, string> = {
 
 const ageCategories = ["7-8", "9-10", "11-12", "13-14", "15-17", "عمومي"];
 
+function getTimeGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "صباح الخير";
+  if (hour < 18) return "مساء الخير";
+  return "مساء النور";
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const [counts, setCounts] = useState({
@@ -101,7 +108,7 @@ export default function Dashboard() {
     <Layout>
       <div className="card mb-6">
         <h2 className="text-xl font-bold text-abha-green mb-2">
-          مرحباً {user.name || "بك"} 👋
+          {getTimeGreeting()} {user.name || ""} 👋
         </h2>
         <p className="text-gray-600">{greetings[user.role]}</p>
       </div>

@@ -5,6 +5,7 @@ import {
   updateDoc,
   onSnapshot,
 } from "firebase/firestore";
+import jsPDF from "jspdf";
 import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
 import Layout from "../components/Layout";
@@ -215,6 +216,60 @@ export default function CompetitionsManager() {
     if (medal === "silver") return "🥈";
     if (medal === "bronze") return "🥉";
     return "—";
+  };
+
+  const exportCompetitionPDF = (swimmer: Swimmer, comp: Competition) => {
+    const pdf = new jsPDF("p", "mm", "a4");
+    const pageWidth = pdf.internal.pageSize.getWidth();
+
+    pdf.setFontSize(20);
+    pdf.text("Abha Swim Club", pageWidth / 2, 20, { align: "center" });
+    pdf.setFontSize(14);
+    pdf.text("Competition Results", pageWidth / 2, 30, { align: "center" });
+
+    pdf.setFontSize(12);
+    pdf.text(`Swimmer: ${swimmer.name}`, 15, 45);
+    pdf.text(`Age: ${swimmer.ageCategory}`, 15, 52);
+    pdf.text(`Competition: ${comp.name}`, 15, 59);
+    if (comp.date) pdf.text(`Date: ${comp.date}`, 15, 66);
+
+    const gold = comp.results.filter((r) => r.medal === "gold").length;
+    const silver = comp.results.filter((r) => r.medal === "silver").length;
+    const bronze = comp.results.filter((r) => r.medal === "bronze").length;
+    const totalMedals = gold + silver + bronze;
+    const totalPoints = comp.results.reduce((s, r) => s + (r.points || 0), 0);
+
+    pdf.setFontSize(14);
+    pdf.text("Summary", 15, 80);
+    pdf.setFontSize(11);
+    pdf.text(`Gold: ${gold}  |  Silver: ${silver}  |  Bronze: ${bronze}`, 15, 88);
+    pdf.text(`Total Medals: ${totalMedals}  |  Total Points: ${totalPoints}`, 15, 95);
+
+    pdf.setFontSize(14);
+    pdf.text("Race Results", 15, 110);
+    pdf.setFontSize(10);
+    let y = 120;
+    pdf.text("Event", 15, y);
+    pdf.text("Position", 75, y);
+    pdf.text("Medal", 110, y);
+    pdf.text("Points", 140, y);
+    pdf.text("Time", 165, y);
+    y += 6;
+
+    comp.results.forEach((r) => {
+      if (y > 270) {
+        pdf.addPage();
+        y = 20;
+      }
+      pdf.text(r.event, 15, y);
+      pdf.text(String(r.position || "-"), 75, y);
+      pdf.text(r.medal === "none" ? "-" : r.medal, 110, y);
+      pdf.text(String(r.points || 0), 140, y);
+      pdf.text(r.time || "-", 165, y);
+      y += 6;
+    });
+
+    pdf.save(`نتائج-${swimmer.name}-${comp.name}.pdf`);
   };
 
   if (loading) {
@@ -447,16 +502,36 @@ export default function CompetitionsManager() {
             </div>
           ) : (
             <div className="card">
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                 <button onClick={() => setActiveTab(null)} className="text-sm text-gray-500 hover:text-abha-green">
                   ← رجوع
                 </button>
-                <h2 className="text-lg font-bold text-abha-green">
-                  📊 {canEdit ? "تسجيل النتائج" : "النتائج المحققة"}
-                </h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-bold text-abha-green">
+                    📊 {canEdit ? "تسجيل النتائج" : "النتائج المحققة"}
+                  </h2>
+                  {selectedComp.results.length > 0 && (
+                    <button
+                      onClick={() => exportCompetitionPDF(selectedSwimmer!, selectedComp)}
+                      className="bg-red-500 text-white px-3 py-1 rounded-lg text-xs hover:bg-red-600"
+                    >
+                      📄 PDF
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {/* ✅ ملخص النتائج */}
+              <p className="text-xs text-gray-400 mb-3">
+                آخر تحديث: {new Date().toLocaleString("ar-SA", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+
+              {/* ملخص النتائج */}
               {selectedComp.results.length > 0 && (
                 <div className="bg-gradient-to-br from-abha-green/10 to-abha-gold/10 p-4 rounded-lg mb-4 border-2 border-abha-gold">
                   <h3 className="text-sm font-bold text-abha-green mb-3">🏆 ملخص النتائج</h3>
@@ -500,7 +575,7 @@ export default function CompetitionsManager() {
                 </div>
               )}
 
-              {/* نموذج إضافة نتيجة جديدة (للمدرب فقط) */}
+              {/* نموذج إضافة نتيجة جديدة */}
               {canEdit && (
                 <div className="bg-abha-bg p-3 rounded-lg mb-4">
                   <h3 className="text-sm font-bold text-abha-green mb-2">➕ إضافة نتيجة جديدة</h3>
