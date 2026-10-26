@@ -4,7 +4,7 @@ import {
   query,
   where,
   onSnapshot,
-  setDoc, // ✅ تمت إضافة الاستيراد هنا
+  setDoc,
   updateDoc,
   deleteDoc,
   doc,
@@ -91,6 +91,48 @@ export default function Parents() {
     setPassword(pass);
   };
 
+  // ✅ تصدير CSV
+  const handleExportCSV = () => {
+    if (parents.length === 0) {
+      setMsg({ type: "error", text: "لا يوجد أولياء أمور للتصدير" });
+      return;
+    }
+
+    // BOM لدعم العربية في Excel
+    const BOM = "\uFEFF";
+    
+    // رأس الجدول
+    const headers = ["#", "الاسم", "اسم المستخدم", "كلمة المرور", "الابن", "الحالة"];
+    
+    // الصفوف
+    const rows = parents.map((p, idx) => [
+      idx + 1,
+      p.name,
+      p.username,
+      p.tempPassword,
+      p.swimmerName || "-",
+      p.needsAuthAccount ? "يحتاج تفعيل" : "مُفعّل",
+    ]);
+
+    // بناء CSV
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
+    ].join("\n");
+
+    // تنزيل الملف
+    const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `أولياء-الأمور-${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    setMsg({ type: "success", text: `✅ تم تصدير ${parents.length} ولي أمر` });
+    setTimeout(() => setMsg({ type: "", text: "" }), 3000);
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !username.trim() || !password.trim() || !swimmerId) {
@@ -170,18 +212,35 @@ export default function Parents() {
 
   return (
     <Layout>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
         <h1 className="text-2xl font-bold text-abha-green">👨‍👦 أولياء الأمور</h1>
-        {isAdmin && (
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="btn-primary"
-            disabled={freeSwimmers.length === 0 && !showForm}
-          >
-            {showForm ? "إلغاء" : "➕ إضافة ولي أمر"}
-          </button>
-        )}
+        <div className="flex gap-2">
+          {isAdmin && parents.length > 0 && (
+            <button onClick={handleExportCSV} className="btn-gold text-sm">
+              📊 تصدير Excel
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              onClick={() => setShowForm(!showForm)}
+              className="btn-primary"
+              disabled={freeSwimmers.length === 0 && !showForm}
+            >
+              {showForm ? "إلغاء" : "➕ إضافة ولي أمر"}
+            </button>
+          )}
+        </div>
       </div>
+
+      {msg.text && (
+        <div className={`text-sm rounded-lg p-3 mb-4 whitespace-pre-line ${
+          msg.type === "success"
+            ? "bg-green-50 border border-green-200 text-green-700"
+            : "bg-red-50 border border-red-200 text-red-700"
+        }`}>
+          {msg.text}
+        </div>
+      )}
 
       {freeSwimmers.length === 0 && !showForm && (
         <div className="card mb-4 bg-yellow-50 border-yellow-200">
@@ -194,6 +253,7 @@ export default function Parents() {
       {showForm && isAdmin && (
         <form onSubmit={handleSubmit} className="card mb-6 space-y-4">
           <h2 className="text-lg font-bold text-abha-green mb-3">📝 بيانات ولي الأمر</h2>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold mb-1">الاسم الكامل *</label>
@@ -201,10 +261,10 @@ export default function Parents() {
             </div>
             <div>
               <label className="block text-sm font-semibold mb-1">اسم المستخدم *</label>
-              <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="input" dir="ltr" required />
+              <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="input" dir="ltr" placeholder="ex: ahmed_dad" required />
             </div>
             <div>
-              <label className="block text-sm font-semibold mb-1">كلمة المرور *</label>
+              <label className="block text-sm font-semibold mb-1">كلمة المرور المؤقتة *</label>
               <div className="flex gap-2">
                 <input type="text" value={password} onChange={(e) => setPassword(e.target.value)} className="input" dir="ltr" required />
                 <button type="button" onClick={generatePassword} className="btn-gold whitespace-nowrap">🎲</button>
@@ -212,27 +272,27 @@ export default function Parents() {
             </div>
             <div>
               <label className="block text-sm font-semibold mb-1">الإيميل (اختياري)</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input" dir="ltr" />
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input" dir="ltr" placeholder="للاسترجاع" />
             </div>
           </div>
+
           <div className="border-t pt-4">
-            <label className="block text-sm font-semibold mb-2">🔗 اختر السباح *</label>
+            <label className="block text-sm font-semibold mb-2">🔗 اختر السباح (ابنه) *</label>
             <select value={swimmerId} onChange={(e) => setSwimmerId(e.target.value)} className="input" required>
+              {freeSwimmers.length === 0 && <option value="">لا يوجد سباحون متاحون</option>}
               {freeSwimmers.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
           </div>
-          {msg.text && (
-            <div className={`text-sm rounded-lg p-3 whitespace-pre-line ${msg.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
-              {msg.text}
-            </div>
-          )}
+
           <div className="flex gap-3">
             <button type="submit" disabled={loading} className="btn-primary disabled:opacity-50">
               {loading ? "جاري الحفظ..." : "✅ حفظ وربط"}
             </button>
-            <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-gray-600">إلغاء</button>
+            <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-gray-600">
+              إلغاء
+            </button>
           </div>
         </form>
       )}
@@ -242,7 +302,9 @@ export default function Parents() {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="card text-center py-12"><p className="text-gray-500">لا يوجد أولياء أمور مسجلون حالياً</p></div>
+        <div className="card text-center py-12">
+          <p className="text-gray-500">لا يوجد أولياء أمور مسجلون حالياً</p>
+        </div>
       ) : (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
