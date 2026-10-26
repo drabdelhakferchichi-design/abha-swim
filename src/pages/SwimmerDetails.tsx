@@ -48,15 +48,20 @@ interface VideoLink {
   url: string;
 }
 
+interface RaceResult {
+  event: string;
+  position: number;
+  medal: "gold" | "silver" | "bronze" | "none";
+  points: number;
+  time: string;
+}
+
 interface CompetitionEntry {
   id: string;
   competitionName: string;
   date: string;
-  races: string[];
-  gold: number;
-  silver: number;
-  bronze: number;
-  points: number;
+  plannedRaces: string[];
+  results: RaceResult[];
 }
 
 interface Swimmer {
@@ -166,11 +171,8 @@ export default function SwimmerDetails() {
   const [reportAchievements, setReportAchievements] = useState("");
   const [reportSaving, setReportSaving] = useState(false);
 
-  // ✅ المدرب فقط يمكنه التعديل (وليس أبو ناصر)
   const canEdit =
     user?.role === "coach" && swimmer?.coachId === user.uid;
-
-  // ✅ أبو ناصر يرى فقط (بدون تعديل)
   const isReadOnly = user?.role === "admin";
 
   useEffect(() => {
@@ -389,6 +391,13 @@ export default function SwimmerDetails() {
     if (!timesByEvent[t.event]) timesByEvent[t.event] = [];
     timesByEvent[t.event].push(t);
   });
+
+  const getMedalEmoji = (medal: string) => {
+    if (medal === "gold") return "🥇";
+    if (medal === "silver") return "🥈";
+    if (medal === "bronze") return "🥉";
+    return "—";
+  };
 
   return (
     <Layout>
@@ -670,11 +679,8 @@ export default function SwimmerDetails() {
                   id: `comp_${Date.now()}`,
                   competitionName: newCompetitionName.trim(),
                   date: newCompetitionDate,
-                  races: [],
-                  gold: 0,
-                  silver: 0,
-                  bronze: 0,
-                  points: 0,
+                  plannedRaces: [],
+                  results: [],
                 };
                 setCompetitions([...competitions, newComp]);
                 setNewCompetitionName("");
@@ -690,15 +696,13 @@ export default function SwimmerDetails() {
         {competitions.length === 0 ? (
           <p className="text-center text-gray-500 py-4">لا توجد بطولات مسجّلة</p>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {competitions.map((comp, cIdx) => (
               <div key={comp.id} className="border rounded-lg p-3">
                 <div className="flex items-start justify-between mb-2">
                   <div>
                     <h3 className="font-bold text-abha-green">{comp.competitionName}</h3>
-                    {comp.date && (
-                      <p className="text-xs text-gray-500" dir="ltr">📅 {comp.date}</p>
-                    )}
+                    {comp.date && <p className="text-xs text-gray-500" dir="ltr">📅 {comp.date}</p>}
                   </div>
                   {canEdit && (
                     <button
@@ -712,156 +716,180 @@ export default function SwimmerDetails() {
                     </button>
                   )}
                 </div>
-
-                {/* السباقات المشارك فيها */}
-                <div className="mb-2">
-                  <p className="text-xs font-semibold text-gray-600 mb-1">🏊 السباقات:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {allRaces.map((race) => (
-                      <button
-                        key={race}
-                        type="button"
-                        disabled={!canEdit}
-                        onClick={() => {
-                          const updated = [...competitions];
-                          const races = [...updated[cIdx].races];
-                          if (races.includes(race)) {
-                            updated[cIdx].races = races.filter((r) => r !== race);
-                          } else {
-                            updated[cIdx].races = [...races, race];
-                          }
-                          setCompetitions(updated);
-                        }}
-                        className={`px-2 py-1 rounded text-xs ${
-                          comp.races.includes(race)
-                            ? "bg-abha-green text-white"
-                            : "bg-gray-100 text-gray-600"
-                        } ${!canEdit ? "opacity-60 cursor-not-allowed" : ""}`}
-                      >
-                        {comp.races.includes(race) ? "✓ " : ""}{race}
-                      </button>
-                    ))}
-                  </div>
+                {/* المرحلة 1: السباقات المخططة */}
+                <div className="mb-3">
+                  <p className="text-xs font-semibold text-gray-600 mb-1">
+                    🏊 السباقات المخططة :
+                  </p>
+                  {canEdit ? (
+                    <div className="flex flex-wrap gap-1">
+                      {allRaces.map((race) => (
+                        <button
+                          key={race}
+                          type="button"
+                          onClick={() => {
+                            const updated = [...competitions];
+                            const planned = [...updated[cIdx].plannedRaces];
+                            if (planned.includes(race)) {
+                              updated[cIdx].plannedRaces = planned.filter((r) => r !== race);
+                              updated[cIdx].results = updated[cIdx].results.filter((r) => r.event !== race);
+                            } else {
+                              updated[cIdx].plannedRaces = [...planned, race];
+                            }
+                            setCompetitions(updated);
+                          }}
+                          className={`px-2 py-1 rounded text-xs ${
+                            comp.plannedRaces.includes(race)
+                              ? "bg-abha-green text-white"
+                              : "bg-gray-100 text-gray-600"
+                          }`}
+                        >
+                          {comp.plannedRaces.includes(race) ? "✓ " : ""}{race}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
+                      {comp.plannedRaces.length === 0 ? (
+                        <span className="text-xs text-gray-400">لم يتم التخطيط</span>
+                      ) : (
+                        comp.plannedRaces.map((race) => (
+                          <span key={race} className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">
+                            {race}
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {/* الميداليات والنقاط */}
-                <div className="grid grid-cols-4 gap-2 mt-3">
-                  <div>
-                    <label className="block text-xs font-semibold mb-1">🥇 ذهبية</label>
-                    <input
-                      type="number"
-                      value={comp.gold || ""}
-                      onChange={(e) => {
-                        const updated = [...competitions];
-                        updated[cIdx].gold = Number(e.target.value) || 0;
-                        setCompetitions(updated);
-                      }}
-                      className="input text-sm"
-                      disabled={!canEdit}
-                      min={0}
-                      placeholder="0"
-                    />
+                {/* المرحلة 2: النتائج المحققة */}
+                {comp.plannedRaces.length > 0 && (
+                  <div className="mt-3 pt-3 border-t">
+                    <p className="text-xs font-semibold text-gray-600 mb-2">
+                      📊 النتائج المحققة :
+                    </p>
+                    <div className="space-y-2">
+                      {comp.plannedRaces.map((race) => {
+                        const result = comp.results.find((r) => r.event === race);
+                        return (
+                          <div key={race} className="bg-abha-bg p-2 rounded">
+                            <p className="text-xs font-semibold mb-1">🏅 {race}</p>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                              <div>
+                                <label className="block text-xs text-gray-500 mb-0.5">المركز</label>
+                                <input
+                                  type="number"
+                                  value={result?.position || ""}
+                                  onChange={(e) => {
+                                    const updated = [...competitions];
+                                    const val = Number(e.target.value) || 0;
+                                    const idx = updated[cIdx].results.findIndex((r) => r.event === race);
+                                    if (idx >= 0) {
+                                      updated[cIdx].results[idx].position = val;
+                                    } else {
+                                      updated[cIdx].results.push({
+                                        event: race, position: val, medal: "none", points: 0, time: "",
+                                      });
+                                    }
+                                    setCompetitions(updated);
+                                  }}
+                                  className="input text-xs"
+                                  disabled={!canEdit}
+                                  min={1}
+                                  placeholder="1"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-500 mb-0.5">الميدالية</label>
+                                <select
+                                  value={result?.medal || "none"}
+                                  onChange={(e) => {
+                                    const updated = [...competitions];
+                                    const val = e.target.value as "gold" | "silver" | "bronze" | "none";
+                                    const idx = updated[cIdx].results.findIndex((r) => r.event === race);
+                                    if (idx >= 0) {
+                                      updated[cIdx].results[idx].medal = val;
+                                    } else {
+                                      updated[cIdx].results.push({
+                                        event: race, position: 0, medal: val, points: 0, time: "",
+                                      });
+                                    }
+                                    setCompetitions(updated);
+                                  }}
+                                  className="input text-xs"
+                                  disabled={!canEdit}
+                                >
+                                  <option value="none">بدون</option>
+                                  <option value="gold">🥇 ذهبية</option>
+                                  <option value="silver">🥈 فضية</option>
+                                  <option value="bronze">🥉 برونزية</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-500 mb-0.5">النقاط</label>
+                                <input
+                                  type="number"
+                                  value={result?.points || ""}
+                                  onChange={(e) => {
+                                    const updated = [...competitions];
+                                    const val = Number(e.target.value) || 0;
+                                    const idx = updated[cIdx].results.findIndex((r) => r.event === race);
+                                    if (idx >= 0) {
+                                      updated[cIdx].results[idx].points = val;
+                                    } else {
+                                      updated[cIdx].results.push({
+                                        event: race, position: 0, medal: "none", points: val, time: "",
+                                      });
+                                    }
+                                    setCompetitions(updated);
+                                  }}
+                                  className="input text-xs"
+                                  disabled={!canEdit}
+                                  min={0}
+                                  placeholder="0"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-500 mb-0.5">الزمن</label>
+                                <input
+                                  type="text"
+                                  value={result?.time || ""}
+                                  onChange={(e) => {
+                                    const updated = [...competitions];
+                                    const val = e.target.value;
+                                    const idx = updated[cIdx].results.findIndex((r) => r.event === race);
+                                    if (idx >= 0) {
+                                      updated[cIdx].results[idx].time = val;
+                                    } else {
+                                      updated[cIdx].results.push({
+                                        event: race, position: 0, medal: "none", points: 0, time: val,
+                                      });
+                                    }
+                                    setCompetitions(updated);
+                                  }}
+                                  className="input text-xs"
+                                  dir="ltr"
+                                  disabled={!canEdit}
+                                  placeholder="32.45"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold mb-1">🥈 فضية</label>
-                    <input
-                      type="number"
-                      value={comp.silver || ""}
-                      onChange={(e) => {
-                        const updated = [...competitions];
-                        updated[cIdx].silver = Number(e.target.value) || 0;
-                        setCompetitions(updated);
-                      }}
-                      className="input text-sm"
-                      disabled={!canEdit}
-                      min={0}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold mb-1">🥉 برونزية</label>
-                    <input
-                      type="number"
-                      value={comp.bronze || ""}
-                      onChange={(e) => {
-                        const updated = [...competitions];
-                        updated[cIdx].bronze = Number(e.target.value) || 0;
-                        setCompetitions(updated);
-                      }}
-                      className="input text-sm"
-                      disabled={!canEdit}
-                      min={0}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold mb-1">⭐ نقاط</label>
-                    <input
-                      type="number"
-                      value={comp.points || ""}
-                      onChange={(e) => {
-                        const updated = [...competitions];
-                        updated[cIdx].points = Number(e.target.value) || 0;
-                        setCompetitions(updated);
-                      }}
-                      className="input text-sm"
-                      disabled={!canEdit}
-                      min={0}
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
 
-      <div className="card mb-6">
-        <h2 className="text-lg font-bold text-abha-green mb-4">🎥 فيديوهات تعليمية</h2>
-
-        {canEdit && (
-          <div className="bg-abha-bg p-3 rounded-lg mb-4">
-            <h3 className="text-sm font-semibold mb-2">➕ إضافة فيديو YouTube</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
-              <input type="text" value={newVideoTitle} onChange={(e) => setNewVideoTitle(e.target.value)} className="input text-sm" placeholder="عنوان الفيديو..." />
-              <input type="url" value={newVideoUrl} onChange={(e) => setNewVideoUrl(e.target.value)} className="input text-sm" dir="ltr" placeholder="https://youtube.com/watch?v=..." />
-            </div>
-            <button onClick={handleAddVideo} className="btn-gold text-sm">➕ إضافة</button>
-          </div>
-        )}
-
-        {videos.length === 0 ? (
-          <p className="text-center text-gray-500 py-4">لا توجد فيديوهات</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {videos.map((v, idx) => {
-              const ytId = extractYouTubeId(v.url);
-              return (
-                <div key={idx} className="border rounded-lg overflow-hidden">
-                  {ytId && (
-                    <iframe src={`https://www.youtube.com/embed/${ytId}`} className="w-full aspect-video" allowFullScreen title={v.title} />
-                  )}
-                  <div className="p-2 flex items-center justify-between bg-abha-bg">
-                    <p className="text-sm font-semibold">{v.title}</p>
-                    {canEdit && (
-                      <button onClick={() => handleRemoveVideo(idx)} className="text-red-500 hover:text-red-700">🗑️</button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-            {canEdit && (
+      {canEdit && (
         <div className="mb-6">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="btn-primary disabled:opacity-50"
-          >
+          <button onClick={handleSave} disabled={saving} className="btn-primary disabled:opacity-50">
             {saving ? "جاري الحفظ..." : "💾 حفظ جميع التعديلات"}
           </button>
         </div>
@@ -892,25 +920,20 @@ export default function SwimmerDetails() {
                       <Line
                         data={{
                           labels: sortedForChart.map((t) => t.date),
-                          datasets: [
-                            {
-                              label: event,
-                              data: sortedForChart.map((t) => timeToSeconds(t.time)),
-                              borderColor: "#1B5E20",
-                              backgroundColor: "rgba(27, 94, 32, 0.2)",
-                              tension: 0.3,
-                              pointBackgroundColor: "#C9A227",
-                            },
-                          ],
+                          datasets: [{
+                            label: event,
+                            data: sortedForChart.map((t) => timeToSeconds(t.time)),
+                            borderColor: "#1B5E20",
+                            backgroundColor: "rgba(27, 94, 32, 0.2)",
+                            tension: 0.3,
+                            pointBackgroundColor: "#C9A227",
+                          }],
                         }}
                         options={{
                           responsive: true,
                           plugins: { legend: { display: false } },
                           scales: {
-                            y: {
-                              reverse: true,
-                              title: { display: true, text: "الزمن (ثواني)" },
-                            },
+                            y: { reverse: true, title: { display: true, text: "الزمن (ثواني)" } },
                           },
                         }}
                       />
@@ -921,15 +944,8 @@ export default function SwimmerDetails() {
                     {eventTimes.map((t) => {
                       const isBest = timeToSeconds(t.time) === bestTime;
                       return (
-                        <div
-                          key={t.id}
-                          className={`p-2 rounded text-center ${
-                            isBest ? "bg-abha-gold text-white font-bold" : "bg-abha-bg"
-                          }`}
-                        >
-                          <div className="font-mono text-lg" dir="ltr">
-                            {t.time}
-                          </div>
+                        <div key={t.id} className={`p-2 rounded text-center ${isBest ? "bg-abha-gold text-white font-bold" : "bg-abha-bg"}`}>
+                          <div className="font-mono text-lg" dir="ltr">{t.time}</div>
                           <div className="text-xs opacity-80">{t.date || "-"}</div>
                           {isBest && <div className="text-xs mt-1">🏆</div>}
                         </div>
