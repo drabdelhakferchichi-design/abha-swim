@@ -45,7 +45,9 @@ const allRaces = [
 export default function CompetitionsManager() {
   const { user } = useAuth();
   const [swimmers, setSwimmers] = useState<Swimmer[]>([]);
-  const [selectedSwimmer, setSelectedSwimmer] = useState<Swimmer | null>(null);
+  const [selectedSwimmerId, setSelectedSwimmerId] = useState<string>("");
+  const [selectedCompId, setSelectedCompId] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<"races" | "results" | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState({ type: "", text: "" });
@@ -53,7 +55,7 @@ export default function CompetitionsManager() {
   const [newCompName, setNewCompName] = useState("");
   const [newCompDate, setNewCompDate] = useState("");
 
-  // تحميل السباحين (مع الفلترة حسب الدور)
+  // تحميل السباحين
   useEffect(() => {
     if (!user) return;
     const unsub = onSnapshot(collection(db, "swimmers"), (snap) => {
@@ -76,26 +78,19 @@ export default function CompetitionsManager() {
       }
 
       setSwimmers(items);
-      if (items.length > 0 && !selectedSwimmer) {
-        setSelectedSwimmer(items[0]);
+      if (items.length > 0 && !selectedSwimmerId) {
+        setSelectedSwimmerId(items[0].id);
       }
       setLoading(false);
     });
     return () => unsub();
-  }, [user, selectedSwimmer]);
+  }, [user, selectedSwimmerId]);
 
   const canEdit = user?.role === "coach";
+  const selectedSwimmer = swimmers.find((s) => s.id === selectedSwimmerId) || null;
+  const selectedComp = selectedSwimmer?.competitions?.find((c) => c.id === selectedCompId) || null;
 
-  // تحديث السباح المحدد إذا تغيرت البيانات
-  useEffect(() => {
-    if (selectedSwimmer) {
-      const fresh = swimmers.find((s) => s.id === selectedSwimmer.id);
-      if (fresh && JSON.stringify(fresh.competitions) !== JSON.stringify(selectedSwimmer.competitions)) {
-        setSelectedSwimmer(fresh);
-      }
-    }
-  }, [swimmers, selectedSwimmer]);
-
+  // حفظ السباح
   const saveSwimmer = async (swimmer: Swimmer) => {
     setSaving(true);
     setMsg({ type: "", text: "" });
@@ -112,6 +107,7 @@ export default function CompetitionsManager() {
     setSaving(false);
   };
 
+  // إضافة بطولة جديدة
   const addCompetition = () => {
     if (!selectedSwimmer || !newCompName.trim()) return;
     const newComp: Competition = {
@@ -125,43 +121,43 @@ export default function CompetitionsManager() {
       ...selectedSwimmer,
       competitions: [...(selectedSwimmer.competitions || []), newComp],
     };
-    setSelectedSwimmer(updated);
     setSwimmers(swimmers.map((s) => (s.id === updated.id ? updated : s)));
+    setSelectedCompId(newComp.id);
     setNewCompName("");
     setNewCompDate("");
+    saveSwimmer(updated);
   };
 
-  const toggleRace = (compIdx: number, race: string) => {
-    if (!selectedSwimmer) return;
+  // toggle السباق
+  const toggleRace = (race: string) => {
+    if (!selectedSwimmer || !selectedComp) return;
     const comps = [...(selectedSwimmer.competitions || [])];
-    const comp = comps[compIdx];
-    const planned = [...comp.plannedRaces];
+    const idx = comps.findIndex((c) => c.id === selectedComp.id);
+    if (idx < 0) return;
+
+    const planned = [...comps[idx].plannedRaces];
     if (planned.includes(race)) {
-      comp.plannedRaces = planned.filter((r) => r !== race);
-      comp.results = comp.results.filter((r) => r.event !== race);
+      comps[idx].plannedRaces = planned.filter((r) => r !== race);
+      comps[idx].results = comps[idx].results.filter((r) => r.event !== race);
     } else {
-      comp.plannedRaces = [...planned, race];
+      comps[idx].plannedRaces = [...planned, race];
     }
     const updated: Swimmer = { ...selectedSwimmer, competitions: comps };
-    setSelectedSwimmer(updated);
     setSwimmers(swimmers.map((s) => (s.id === updated.id ? updated : s)));
   };
 
-  const updateResult = (
-    compIdx: number,
-    race: string,
-    field: keyof SwimResult,
-    value: string | number
-  ) => {
-    if (!selectedSwimmer) return;
+  // تحديث نتيجة
+  const updateResult = (race: string, field: keyof SwimResult, value: string | number) => {
+    if (!selectedSwimmer || !selectedComp) return;
     const comps = [...(selectedSwimmer.competitions || [])];
-    const comp = comps[compIdx];
-    const resultIdx = comp.results.findIndex((r) => r.event === race);
+    const idx = comps.findIndex((c) => c.id === selectedComp.id);
+    if (idx < 0) return;
 
+    const resultIdx = comps[idx].results.findIndex((r) => r.event === race);
     if (resultIdx >= 0) {
-      comp.results[resultIdx] = { ...comp.results[resultIdx], [field]: value };
+      comps[idx].results[resultIdx] = { ...comps[idx].results[resultIdx], [field]: value };
     } else {
-      comp.results.push({
+      comps[idx].results.push({
         event: race,
         position: field === "position" ? Number(value) : 0,
         medal: field === "medal" ? (value as "gold" | "silver" | "bronze" | "none") : "none",
@@ -169,19 +165,20 @@ export default function CompetitionsManager() {
         time: field === "time" ? String(value) : "",
       });
     }
-
     const updated: Swimmer = { ...selectedSwimmer, competitions: comps };
-    setSelectedSwimmer(updated);
     setSwimmers(swimmers.map((s) => (s.id === updated.id ? updated : s)));
   };
 
-  const deleteCompetition = (compIdx: number) => {
-    if (!selectedSwimmer) return;
+  // حذف بطولة
+  const deleteCompetition = () => {
+    if (!selectedSwimmer || !selectedComp) return;
     if (!confirm("حذف البطولة ؟")) return;
-    const comps = (selectedSwimmer.competitions || []).filter((_, i) => i !== compIdx);
+    const comps = (selectedSwimmer.competitions || []).filter((c) => c.id !== selectedComp.id);
     const updated: Swimmer = { ...selectedSwimmer, competitions: comps };
-    setSelectedSwimmer(updated);
     setSwimmers(swimmers.map((s) => (s.id === updated.id ? updated : s)));
+    setSelectedCompId("");
+    setActiveTab(null);
+    saveSwimmer(updated);
   };
 
   if (loading) {
@@ -208,214 +205,274 @@ export default function CompetitionsManager() {
         </div>
       )}
 
-      {swimmers.length === 0 ? (
-        <div className="card text-center py-12">
-          <p className="text-gray-500">لا يوجد سباحون</p>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        {/* العمود 1: قائمة السباحين */}
+        <div className="card lg:col-span-1">
+          <h2 className="font-bold text-abha-green mb-3">👥 السباحون</h2>
+          <div className="space-y-1">
+            {swimmers.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => { setSelectedSwimmerId(s.id); setSelectedCompId(""); setActiveTab(null); }}
+                className={`w-full text-right p-2 rounded-lg text-sm transition ${
+                  selectedSwimmerId === s.id
+                    ? "bg-abha-green text-white font-semibold"
+                    : "hover:bg-abha-bg"
+                }`}
+              >
+                <div>{s.name}</div>
+                <div className={`text-xs ${selectedSwimmerId === s.id ? "text-white/80" : "text-gray-500"}`}>
+                  {s.ageCategory}
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-          {/* قائمة السباحين */}
-          <div className="card lg:col-span-1">
-            <h2 className="font-bold text-abha-green mb-3">👥 اختر السباح</h2>
-            <div className="space-y-1">
-              {swimmers.map((s) => (
+
+        {/* العمود 2: بطولات السباح */}
+        <div className="card lg:col-span-1">
+          <h2 className="font-bold text-abha-green mb-3">🏆 بطولات {selectedSwimmer?.name || ""}</h2>
+
+          {canEdit && (
+            <div className="bg-abha-bg p-2 rounded mb-3">
+              <input
+                type="text"
+                value={newCompName}
+                onChange={(e) => setNewCompName(e.target.value)}
+                className="input text-xs mb-1"
+                placeholder="اسم البطولة"
+              />
+              <input
+                type="date"
+                value={newCompDate}
+                onChange={(e) => setNewCompDate(e.target.value)}
+                className="input text-xs mb-1"
+                dir="ltr"
+              />
+              <button onClick={addCompetition} className="btn-gold text-xs w-full">
+                ➕ إضافة
+              </button>
+            </div>
+          )}
+
+          <div className="space-y-1">
+            {selectedSwimmer?.competitions?.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => { setSelectedCompId(c.id); setActiveTab(null); }}
+                className={`w-full text-right p-2 rounded-lg text-sm transition ${
+                  selectedCompId === c.id
+                    ? "bg-abha-gold text-white font-semibold"
+                    : "hover:bg-abha-bg"
+                }`}
+              >
+                <div className="font-semibold">{c.name}</div>
+                {c.date && <div className="text-xs opacity-80">{c.date}</div>}
+                <div className="text-xs mt-1">
+                  {c.plannedRaces.length} سباق
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* العمود 3-4: المحتوى */}
+        <div className="lg:col-span-2">
+          {!selectedComp ? (
+            <div className="card text-center py-12">
+              <p className="text-gray-500">اختر بطولة من القائمة لعرض تفاصيلها</p>
+            </div>
+          ) : activeTab === null ? (
+            // اختيار المرحلة
+            <div className="card">
+              <h2 className="text-lg font-bold text-abha-green mb-2">🏆 {selectedComp.name}</h2>
+              {selectedComp.date && <p className="text-xs text-gray-500 mb-4">📅 {selectedComp.date}</p>}
+
+              <p className="text-sm text-gray-600 mb-4">
+                اختر ما تريد إدخاله :
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* بطاقة تسجيل السباقات */}
                 <button
-                  key={s.id}
-                  onClick={() => setSelectedSwimmer(s)}
-                  className={`w-full text-right p-2 rounded-lg text-sm transition ${
-                    selectedSwimmer?.id === s.id
-                      ? "bg-abha-green text-white font-semibold"
-                      : "hover:bg-abha-bg"
+                  onClick={() => setActiveTab("races")}
+                  className="card text-center hover:shadow-lg transition border-2 border-blue-200 bg-blue-50 p-6"
+                >
+                  <div className="text-5xl mb-3">🏊</div>
+                  <h3 className="font-bold text-lg text-blue-700 mb-1">تسجيل السباقات</h3>
+                  <p className="text-xs text-gray-600">قبل البطولة</p>
+                  <p className="text-xs text-blue-600 mt-2 font-semibold">
+                    {selectedComp.plannedRaces.length} سباق مسجّل
+                  </p>
+                </button>
+
+                {/* بطاقة تسجيل النتائج */}
+                <button
+                  onClick={() => setActiveTab("results")}
+                  disabled={selectedComp.plannedRaces.length === 0}
+                  className={`card text-center hover:shadow-lg transition border-2 p-6 ${
+                    selectedComp.plannedRaces.length > 0
+                      ? "border-green-200 bg-green-50"
+                      : "border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed"
                   }`}
                 >
-                  <div>{s.name}</div>
-                  <div className={`text-xs ${selectedSwimmer?.id === s.id ? "text-white/80" : "text-gray-500"}`}>
-                    {s.ageCategory}
-                  </div>
+                  <div className="text-5xl mb-3">📊</div>
+                  <h3 className={`font-bold text-lg mb-1 ${selectedComp.plannedRaces.length > 0 ? "text-green-700" : "text-gray-400"}`}>
+                    تسجيل النتائج
+                  </h3>
+                  <p className="text-xs text-gray-600">بعد البطولة</p>
+                  {selectedComp.plannedRaces.length === 0 && (
+                    <p className="text-xs text-red-500 mt-2">⚠️ سجّل السباقات أولاً</p>
+                  )}
                 </button>
-              ))}
+              </div>
+
+              {canEdit && (
+                <button
+                  onClick={deleteCompetition}
+                  className="text-red-500 hover:text-red-700 text-xs mt-4"
+                >
+                  🗑️ حذف البطولة
+                </button>
+              )}
             </div>
-          </div>
+          ) : activeTab === "races" ? (
+            // صفحة السباقات
+            <div className="card">
+              <div className="flex items-center justify-between mb-3">
+                <button onClick={() => setActiveTab(null)} className="text-sm text-gray-500 hover:text-abha-green">
+                  ← رجوع
+                </button>
+                <h2 className="text-lg font-bold text-abha-green">🏊 تسجيل السباقات</h2>
+              </div>
 
-          {/* محتوى السباح المحدد */}
-          <div className="lg:col-span-3">
-            {selectedSwimmer && (
-              <>
-                <div className="card mb-4">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-bold text-abha-green">
-                      🏊 {selectedSwimmer.name} — {selectedSwimmer.ageCategory}
-                    </h2>
-                    {canEdit && (
-                      <button
-                        onClick={() => saveSwimmer(selectedSwimmer)}
-                        disabled={saving}
-                        className="btn-primary text-sm disabled:opacity-50"
-                      >
-                        {saving ? "جاري الحفظ..." : "💾 حفظ"}
-                      </button>
-                    )}
-                  </div>
-                </div>
+              <p className="text-xs text-gray-600 mb-3">
+                حدد السباقات التي سيشارك فيها السباح :
+              </p>
 
-                {/* إضافة بطولة */}
-                {canEdit && (
-                  <div className="card mb-4">
-                    <h3 className="font-bold text-abha-green mb-2">➕ إضافة بطولة جديدة</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
-                      <input
-                        type="text"
-                        value={newCompName}
-                        onChange={(e) => setNewCompName(e.target.value)}
-                        className="input text-sm sm:col-span-2"
-                        placeholder="اسم البطولة"
-                      />
-                      <input
-                        type="date"
-                        value={newCompDate}
-                        onChange={(e) => setNewCompDate(e.target.value)}
-                        className="input text-sm"
-                        dir="ltr"
-                      />
-                    </div>
-                    <button onClick={addCompetition} className="btn-gold text-sm">
-                      ➕ إضافة
+              {canEdit ? (
+                <div className="flex flex-wrap gap-1">
+                  {allRaces.map((race) => (
+                    <button
+                      key={race}
+                      type="button"
+                      onClick={() => toggleRace(race)}
+                      className={`px-2 py-1 rounded text-xs ${
+                        selectedComp.plannedRaces.includes(race)
+                          ? "bg-abha-green text-white"
+                          : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      {selectedComp.plannedRaces.includes(race) ? "✓ " : ""}{race}
                     </button>
-                  </div>
-                )}
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-1">
+                  {selectedComp.plannedRaces.map((r) => (
+                    <span key={r} className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">
+                      {r}
+                    </span>
+                  ))}
+                </div>
+              )}
 
-                {/* البطولات */}
-                {(selectedSwimmer.competitions || []).length === 0 ? (
-                  <div className="card text-center py-6">
-                    <p className="text-gray-500">لا توجد بطولات مسجّلة لهذا السباح</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {selectedSwimmer.competitions!.map((comp, cIdx) => (
-                      <div key={comp.id} className="card">
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <h3 className="font-bold text-abha-green">{comp.name}</h3>
-                            {comp.date && <p className="text-xs text-gray-500" dir="ltr">📅 {comp.date}</p>}
-                          </div>
-                          {canEdit && (
-                            <button
-                              onClick={() => deleteCompetition(cIdx)}
-                              className="text-red-500 hover:text-red-700"
-                            >
-                              🗑️
-                            </button>
-                          )}
+              {canEdit && (
+                <button
+                  onClick={() => saveSwimmer(selectedSwimmer!)}
+                  disabled={saving}
+                  className="btn-primary mt-4 text-sm w-full disabled:opacity-50"
+                >
+                  {saving ? "جاري الحفظ..." : "💾 حفظ السباقات"}
+                </button>
+              )}
+            </div>
+          ) : (
+            // صفحة النتائج
+            <div className="card">
+              <div className="flex items-center justify-between mb-3">
+                <button onClick={() => setActiveTab(null)} className="text-sm text-gray-500 hover:text-abha-green">
+                  ← رجوع
+                </button>
+                <h2 className="text-lg font-bold text-abha-green">📊 تسجيل النتائج</h2>
+              </div>
+
+              <div className="space-y-3">
+                {selectedComp.plannedRaces.map((race) => {
+                  const result = selectedComp.results.find((r) => r.event === race);
+                  return (
+                    <div key={race} className="bg-abha-bg p-3 rounded-lg">
+                      <p className="text-sm font-bold mb-2">🏅 {race}</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-0.5">المركز</label>
+                          <input
+                            type="number"
+                            value={result?.position || ""}
+                            onChange={(e) => updateResult(race, "position", Number(e.target.value))}
+                            className="input text-sm"
+                            disabled={!canEdit}
+                            min={1}
+                            placeholder="1"
+                          />
                         </div>
-
-                        {/* السباقات المخططة */}
-                        <div className="mb-3">
-                          <p className="text-xs font-semibold text-gray-600 mb-1">🏊 السباقات المخططة :</p>
-                          {canEdit ? (
-                            <div className="flex flex-wrap gap-1">
-                              {allRaces.map((race) => (
-                                <button
-                                  key={race}
-                                  type="button"
-                                  onClick={() => toggleRace(cIdx, race)}
-                                  className={`px-2 py-1 rounded text-xs ${
-                                    comp.plannedRaces.includes(race)
-                                      ? "bg-abha-green text-white"
-                                      : "bg-gray-100 text-gray-600"
-                                  }`}
-                                >
-                                  {comp.plannedRaces.includes(race) ? "✓ " : ""}{race}
-                                </button>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="flex flex-wrap gap-1">
-                              {comp.plannedRaces.map((r) => (
-                                <span key={r} className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">
-                                  {r}
-                                </span>
-                              ))}
-                            </div>
-                          )}
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-0.5">الميدالية</label>
+                          <select
+                            value={result?.medal || "none"}
+                            onChange={(e) => updateResult(race, "medal", e.target.value)}
+                            className="input text-sm"
+                            disabled={!canEdit}
+                          >
+                            <option value="none">بدون</option>
+                            <option value="gold">🥇 ذهبية</option>
+                            <option value="silver">🥈 فضية</option>
+                            <option value="bronze">🥉 برونزية</option>
+                          </select>
                         </div>
-
-                        {/* النتائج */}
-                        {comp.plannedRaces.length > 0 && (
-                          <div className="mt-3 pt-3 border-t">
-                            <p className="text-xs font-semibold text-gray-600 mb-2">📊 النتائج :</p>
-                            <div className="space-y-2">
-                              {comp.plannedRaces.map((race) => {
-                                const result = comp.results.find((r) => r.event === race);
-                                return (
-                                  <div key={race} className="bg-abha-bg p-2 rounded">
-                                    <p className="text-sm font-semibold mb-1">🏅 {race}</p>
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                      <div>
-                                        <label className="block text-xs text-gray-500 mb-0.5">المركز</label>
-                                        <input
-                                          type="number"
-                                          value={result?.position || ""}
-                                          onChange={(e) => updateResult(cIdx, race, "position", Number(e.target.value))}
-                                          className="input text-xs"
-                                          disabled={!canEdit}
-                                          min={1}
-                                          placeholder="1"
-                                        />
-                                      </div>
-                                      <div>
-                                        <label className="block text-xs text-gray-500 mb-0.5">الميدالية</label>
-                                        <select
-                                          value={result?.medal || "none"}
-                                          onChange={(e) => updateResult(cIdx, race, "medal", e.target.value)}
-                                          className="input text-xs"
-                                          disabled={!canEdit}
-                                        >
-                                          <option value="none">بدون</option>
-                                          <option value="gold">🥇 ذهبية</option>
-                                          <option value="silver">🥈 فضية</option>
-                                          <option value="bronze">🥉 برونزية</option>
-                                        </select>
-                                      </div>
-                                      <div>
-                                        <label className="block text-xs text-gray-500 mb-0.5">النقاط</label>
-                                        <input
-                                          type="number"
-                                          value={result?.points || ""}
-                                          onChange={(e) => updateResult(cIdx, race, "points", Number(e.target.value))}
-                                          className="input text-xs"
-                                          disabled={!canEdit}
-                                          min={0}
-                                          placeholder="0"
-                                        />
-                                      </div>
-                                      <div>
-                                        <label className="block text-xs text-gray-500 mb-0.5">الزمن</label>
-                                        <input
-                                          type="text"
-                                          value={result?.time || ""}
-                                          onChange={(e) => updateResult(cIdx, race, "time", e.target.value)}
-                                          className="input text-xs"
-                                          dir="ltr"
-                                          disabled={!canEdit}
-                                          placeholder="32.45"
-                                        />
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-0.5">النقاط</label>
+                          <input
+                            type="number"
+                            value={result?.points || ""}
+                            onChange={(e) => updateResult(race, "points", Number(e.target.value))}
+                            className="input text-sm"
+                            disabled={!canEdit}
+                            min={0}
+                            placeholder="0"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-0.5">الزمن</label>
+                          <input
+                            type="text"
+                            value={result?.time || ""}
+                            onChange={(e) => updateResult(race, "time", e.target.value)}
+                            className="input text-sm"
+                            dir="ltr"
+                            disabled={!canEdit}
+                            placeholder="32.45"
+                          />
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {canEdit && (
+                <button
+                  onClick={() => saveSwimmer(selectedSwimmer!)}
+                  disabled={saving}
+                  className="btn-primary mt-4 text-sm w-full disabled:opacity-50"
+                >
+                  {saving ? "جاري الحفظ..." : "💾 حفظ النتائج"}
+                </button>
+              )}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </Layout>
   );
 }
