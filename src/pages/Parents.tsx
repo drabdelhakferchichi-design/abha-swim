@@ -182,18 +182,25 @@ export default function Parents() {
     setLoading(false);
   };
 
-  // ✅ الحذف الآمن — يحذف من Firestore دائماً، ويحاول حذف Auth عبر API (بدون كسر)
+  // ✅ الحذف الآمن — يتجاهل خطأ السباح المحذوف
   const handleDelete = async (parent: Parent) => {
     if (!confirm(`حذف ولي الأمر "${parent.name}" ؟\n\n⚠️ سيُحذف من Firestore (وAuth إن أمكن)`)) return;
 
-    // 1️⃣ حذف من Firestore دائماً (الأكيد)
-    try {
-      if (parent.swimmerId) {
+    // 1️⃣ إزالة الربط من السباح (إذا كان موجوداً) — قد يفشل إذا السباح محذوف
+    if (parent.swimmerId) {
+      try {
         await updateDoc(doc(db, "swimmers", parent.swimmerId), {
           parentUid: "",
           parentName: "",
         });
+      } catch (err) {
+        // نتجاهل — السباح ربما محذوف من قبل
+        console.log("Swimmer not found (skipped):", err);
       }
+    }
+
+    // 2️⃣ حذف وثيقة ولي الأمر — هذا يجب أن ينجح دائماً
+    try {
       await deleteDoc(doc(db, "users", parent.uid));
     } catch (err) {
       console.error("Firestore delete failed:", err);
@@ -201,21 +208,19 @@ export default function Parents() {
       return;
     }
 
-    // 2️⃣ محاولة حذف Auth — بدون كسر (فقط إذا وُجد حساب Auth)
+    // 3️⃣ محاولة حذف Auth — بدون كسر (فقط إذا وُجد حساب Auth)
     if (!parent.needsAuthAccount) {
       try {
-        const response = await fetch("/api/delete-user", {
+        const response = await fetch("/api/delete-user-v2", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ uid: parent.uid }),
         });
         
-        // نجاح صامت — لا نعرض رسالة
         if (response.ok) {
           console.log("✅ Auth deleted");
         }
       } catch (err) {
-        // نتجاهل أي خطأ — الحذف من Firestore تم بنجاح
         console.log("Auth delete skipped:", err);
       }
     }
