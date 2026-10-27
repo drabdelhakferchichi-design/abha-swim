@@ -2,7 +2,6 @@ import { useState, type ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import { useAuth } from "../context/AuthContext";
-import { useNotifications } from "../hooks/useNotifications";
 
 interface LayoutProps {
   children: ReactNode;
@@ -14,13 +13,7 @@ export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ✅ زر الرجوع يظهر فقط في الصفحات الفرعية (وليس الرئيسية أو login)
   const canGoBack = location.pathname !== "/" && location.pathname !== "/login";
-
-  const { permission, requestPermission } = useNotifications({
-    userId: user?.uid,
-    enabled: true,
-  });
 
   return (
     <div className="min-h-screen bg-abha-bg flex" dir="rtl">
@@ -60,19 +53,6 @@ export default function Layout({ children }: LayoutProps) {
           </div>
           <div className="w-8"></div>
         </div>
-
-        {/* شريط الإشعارات */}
-        {permission === "default" && (
-          <div className="bg-abha-gold text-white p-3 text-sm flex items-center justify-between shadow">
-            <span>🔔 فعّل الإشعارات لتصلك المستجدات والرسائل</span>
-            <button
-              onClick={requestPermission}
-              className="bg-white text-abha-gold px-3 py-1 rounded font-semibold text-xs hover:bg-gray-100"
-            >
-              تفعيل
-            </button>
-          </div>
-        )}
 
         <div className="max-w-7xl mx-auto p-3 sm:p-6">
           {/* ✅ زر الرجوع */}
