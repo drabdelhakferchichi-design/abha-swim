@@ -98,13 +98,9 @@ export default function Parents() {
       return;
     }
 
-    // BOM لدعم العربية في Excel
     const BOM = "\uFEFF";
-    
-    // رأس الجدول
     const headers = ["#", "الاسم", "اسم المستخدم", "كلمة المرور", "الابن", "الحالة"];
     
-    // الصفوف
     const rows = parents.map((p, idx) => [
       idx + 1,
       p.name,
@@ -114,13 +110,11 @@ export default function Parents() {
       p.needsAuthAccount ? "يحتاج تفعيل" : "مُفعّل",
     ]);
 
-    // بناء CSV
     const csvContent = [
       headers.join(","),
       ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
     ].join("\n");
 
-    // تنزيل الملف
     const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -188,8 +182,11 @@ export default function Parents() {
     setLoading(false);
   };
 
+  // ✅ الحذف الآمن — يحذف من Firestore دائماً، ويحاول حذف Auth عبر API (بدون كسر)
   const handleDelete = async (parent: Parent) => {
-    if (!confirm(`حذف ولي الأمر "${parent.name}" ؟`)) return;
+    if (!confirm(`حذف ولي الأمر "${parent.name}" ؟\n\n⚠️ سيُحذف من Firestore (وAuth إن أمكن)`)) return;
+
+    // 1️⃣ حذف من Firestore دائماً (الأكيد)
     try {
       if (parent.swimmerId) {
         await updateDoc(doc(db, "swimmers", parent.swimmerId), {
@@ -199,8 +196,32 @@ export default function Parents() {
       }
       await deleteDoc(doc(db, "users", parent.uid));
     } catch (err) {
-      console.error(err);
+      console.error("Firestore delete failed:", err);
+      setMsg({ type: "error", text: "❌ خطأ في الحذف من Firestore" });
+      return;
     }
+
+    // 2️⃣ محاولة حذف Auth — بدون كسر (فقط إذا وُجد حساب Auth)
+    if (!parent.needsAuthAccount) {
+      try {
+        const response = await fetch("/api/delete-user", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ uid: parent.uid }),
+        });
+        
+        // نجاح صامت — لا نعرض رسالة
+        if (response.ok) {
+          console.log("✅ Auth deleted");
+        }
+      } catch (err) {
+        // نتجاهل أي خطأ — الحذف من Firestore تم بنجاح
+        console.log("Auth delete skipped:", err);
+      }
+    }
+
+    setMsg({ type: "success", text: `✅ تم حذف "${parent.name}"` });
+    setTimeout(() => setMsg({ type: "", text: "" }), 3000);
   };
 
   const filtered = parents.filter((p) =>
